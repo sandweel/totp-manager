@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+  <div class="bg-white shadow-xl rounded-xl p-8 max-w-xl mx-auto text-center">
+    <h1 class="text-3xl font-bold text-primary mb-4">Welcome to TOTP Manager</h1>
+    <p class="text-gray-500 mb-6">Securely store and view your 2FA TOTP codes in one place.</p>
+    <div class="flex justify-center gap-4">
+      <a href="/totp/create" class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition shadow-md">🚀 Get Started</a>
+      <a href="/totp/list" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg transition">Your Codes</a>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+pymysql
+cryptography
+python-dotenv
+pyotp
+jinja2
+asyncmy
+python-multipart

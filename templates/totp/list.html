@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Your TOTP Codes{% endblock %}
+
+{% block content %}
+
+<script src="/static/js/totp-list.js"></script>
+
+<div class="bg-white shadow-xl rounded-xl p-6">
+  <h1 class="text-2xl font-bold text-primary mb-6">🔑 Your Codes</h1>
+
+  <div class="overflow-x-auto">
+    <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
+      <thead>
+        <tr class="text-sm text-gray-600">
+          <th class="text-left px-4 py-2">Name</th>
+          <th class="text-center px-4 py-2">Current Code</th>
+          <th class="text-center px-4 py-2">Time Left</th>
+          <th class="text-center px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in totps %}
+        <tr class="bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
+          <td class="px-4 py-3 rounded-l-lg">{{ t.name }}</td>
+          <td class="px-4 py-3 text-center code-cell">
+            <div class="relative group inline-block">
+              <code onclick="copyCode(this)"
+                    class="cursor-pointer bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-mono text-sm group-hover:bg-blue-200 transition">
+                {{ t.code }}
+              </code>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center timer-cell">
+            <div class="flex justify-center items-center h-full">
+              <svg width="32" height="32" viewBox="0 0 36 36" class="countdown-ring">
+                <circle
+                  class="countdown-ring__bg"
+                  stroke="rgb(229 231 235)"
+                  stroke-width="3"
+                  fill="transparent"
+                  r="13"
+                  cx="18"
+                  cy="18"
+                />
+                <circle
+                  class="countdown-ring__progress"
+                  stroke="#3b82f6"
+                  stroke-width="3"
+                  fill="transparent"
+                  r="13"
+                  cx="18"
+                  cy="18"
+                  stroke-linecap="round"
+                  stroke-dasharray="81.6814"
+                  stroke-dashoffset="0"
+                />
+              </svg>
+            </div>
+          </td>
+          <td class="px-4 py-3 text-center rounded-r-lg">
+            <form method="post" action="/totp/{{ t.id }}/delete"
+                  onsubmit="return confirm('Delete this item?');">
+              <button type="submit"
+                      class="bg-danger hover:bg-red-600 text-white py-1.5 px-4 rounded shadow-sm text-sm transition">
+                Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  .countdown-ring {
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    display: block;
+    margin: auto;
+  }
+
+  .countdown-ring__progress {
+    stroke-linecap: round;
+    stroke-dasharray: 81.6814;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+</style>
+{% endblock %}
