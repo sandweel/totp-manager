@@ -5,28 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}TOTP Manager{% endblock %}</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontSize: {
-            base: '1.1rem',
-            lg: '1.25rem',
-            xl: '1.5rem',
-            '2xl': '2rem',
-          },
-          colors: {
-            primary: '#1e293b',
-            'primary-light': '#334155',
-            'primary-text': '#f1f5f9',
-            'primary-hover': '#cbd5e1',
-            danger: '#ef4444',
-          },
-        },
-      },
-    };
-  </script>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-800 font-sans min-h-screen text-base">
 

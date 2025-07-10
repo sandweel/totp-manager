@@ -10,11 +10,24 @@
     });
   }
 
-  async function fetchTotpData() {
+ async function fetchTotpData() {
+  try {
     const resp = await fetch('/api/totp');
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      throw new Error(`Server error: ${resp.status}`);
+    }
     return await resp.json();
+  } catch (err) {
+    console.error("Failed to fetch TOTP data:", err);
+
+    const rows = document.querySelectorAll("#totp-table tbody tr");
+    const errorData = Array.from(rows).map(row => ({
+      id: row.getAttribute("data-id"),
+      code: "Failed to fetch codes"
+    }));
+    return errorData;
   }
+}
 
   function updateCodes(data) {
     const rows = document.querySelectorAll("#totp-table tbody tr");
