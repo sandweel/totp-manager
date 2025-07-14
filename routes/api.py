@@ -1,26 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy.future import select
-import pyotp
-
-from config import async_session, fernet, TOTPItem
+from services.totp_service import TotpService
+from routes.auth import get_current_user  # или из вашего файла deps.py
 
 router = APIRouter(prefix="/api", tags=["api"])
 
+
 @router.get("/totp")
-async def api_totp_list():
-    async with async_session() as session:
-        result = await session.execute(select(TOTPItem))
-        items = result.scalars().all()
-
-    totp_data = []
-    for i in items:
-        try:
-            secret = fernet.decrypt(i.encrypted_secret.encode()).decode()
-            totp = pyotp.TOTP(secret)
-            current_code = totp.now()
-        except Exception:
-            current_code = "Error"
-        totp_data.append({"id": i.id, "code": current_code})
-
-    return JSONResponse(content=totp_data)
+async def api_totp_list(current_user=Depends(get_current_user)):
+    totps = await TotpService.list_all(current_user)
+    return JSONResponse(content=[
+        {"id": t["id"], "name": t["name"], "code": t["code"]}
+        for t in totps
+    ])

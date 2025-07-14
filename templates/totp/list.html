@@ -1,9 +1,7 @@
 {% extends "base.html" %}
-
 {% block title %}Your TOTP Codes{% endblock %}
 
 {% block content %}
-
 <script src="/static/js/totp-list.js"></script>
 
 <div class="bg-white shadow-xl rounded-xl p-6">
@@ -34,33 +32,13 @@
           <td class="px-4 py-3 text-center timer-cell">
             <div class="flex justify-center items-center h-full">
               <svg width="32" height="32" viewBox="0 0 36 36" class="countdown-ring">
-                <circle
-                  class="countdown-ring__bg"
-                  stroke="rgb(229 231 235)"
-                  stroke-width="3"
-                  fill="transparent"
-                  r="13"
-                  cx="18"
-                  cy="18"
-                />
-                <circle
-                  class="countdown-ring__progress"
-                  stroke="#3b82f6"
-                  stroke-width="3"
-                  fill="transparent"
-                  r="13"
-                  cx="18"
-                  cy="18"
-                  stroke-linecap="round"
-                  stroke-dasharray="81.6814"
-                  stroke-dashoffset="0"
-                />
+                <circle class="countdown-ring__bg" stroke="rgb(229 231 235)" stroke-width="3" fill="transparent" r="13" cx="18" cy="18"/>
+                <circle class="countdown-ring__progress" stroke="#3b82f6" stroke-width="3" fill="transparent" r="13" cx="18" cy="18" stroke-linecap="round" stroke-dasharray="81.6814" stroke-dashoffset="0"/>
               </svg>
             </div>
           </td>
           <td class="px-4 py-3 text-center rounded-r-lg">
-            <form method="post" action="/totp/{{ t.id }}/delete"
-                  onsubmit="return confirm('Delete this item?');">
+            <form method="post" action="/totp/{{ t.id }}/delete" onsubmit="return confirm('Delete this item?');">
               <button type="submit"
                       class="bg-danger hover:bg-red-600 text-white py-1.5 px-4 rounded shadow-sm text-sm transition">
                 Delete
@@ -81,7 +59,6 @@
     display: block;
     margin: auto;
   }
-
   .countdown-ring__progress {
     stroke-linecap: round;
     stroke-dasharray: 81.6814;
