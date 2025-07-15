@@ -2,7 +2,8 @@
 {% block title %}Create TOTP Item{% endblock %}
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-<script src="/static/js/totp-create.js"></script>
+<script src="{{ url_for('static', path='js/totp-create.js') }}"></script>
+
 <div class="bg-white shadow-xl rounded-xl p-6 max-w-lg mx-auto">
   <h1 class="text-2xl font-bold text-primary mb-6">➕ Create New TOTP</h1>
   <div id="notification-container"></div>
@@ -20,7 +21,7 @@
     </div>
     <div class="mb-4">
       <label for="secret" class="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
-      <input type="text" id="secret" name="secret" placeholder="Base32 string" value="{{ secret or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+      <input type="text" id="secret" name="secret" placeholder="Base32 string" value="{{ secret or '' }}" required class="w-full border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary" />
     </div>
     <div class="mb-6">
       <label for="qrcode-file" class="block text-sm font-medium text-gray-700 mb-1">Or Upload QR Code Image</label>
