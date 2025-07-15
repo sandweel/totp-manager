@@ -6,8 +6,12 @@
   <h1 class="text-3xl font-bold text-primary mb-4">Welcome to TOTP Manager</h1>
   <p class="text-gray-500 mb-6">Securely store and view your 2FA TOTP codes in one place.</p>
   <div class="flex justify-center gap-4">
-    <a href="/auth/register" class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition shadow-md">Sign Up</a>
-    <a href="/auth/login" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg transition">Sign In</a>
+    {% if user %}
+      <a href="/totp/list" class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition shadow-md">Go to My TOTPs</a>
+    {% else %}
+      <a href="/auth/register" class="bg-primary hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition shadow-md">Sign Up</a>
+      <a href="/auth/login" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg transition">Sign In</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -11,13 +11,37 @@
     <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
       <a href="/" class="text-2xl font-bold tracking-wide">🔐 TOTP Manager</a>
       <div class="flex gap-6 text-lg">
-        <a href="/totp/create" class="hover:text-primary-hover transition">Create</a>
-        <a href="/totp/list" class="hover:text-primary-hover transition">List</a>
-        <a href="/auth/logout" class="hover:text-primary-hover transition">Logout</a>
+        {% if user %}
+          <a href="/totp/create" class="hover:text-primary-hover transition">Create</a>
+          <a href="/totp/list" class="hover:text-primary-hover transition">My TOTPs</a>
+          <a href="/auth/logout" class="hover:text-primary-hover transition">Logout</a>
+        {% else %}
+          <a href="/auth/login" class="hover:text-primary-hover transition">Login</a>
+          <a href="/auth/register" class="hover:text-primary-hover transition">Register</a>
+        {% endif %}
       </div>
     </div>
   </nav>
+
   <main class="max-w-5xl mx-auto px-4 py-10 mt-6">
+    {% if flash %}
+    <div class="mb-6">
+      {% if flash.category == "success" %}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+          {{ flash.message }}
+        </div>
+      {% elif flash.category == "error" %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {{ flash.message }}
+        </div>
+      {% elif flash.category == "info" %}
+        <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+          {{ flash.message }}
+        </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
   </main>
 </body>

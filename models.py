@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from config import Base
 
@@ -11,6 +11,8 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     encrypted_dek = Column(String(512), nullable=False)
+    password_reset_token_id = Column(String(512), nullable=True)
+    password_reset_requested_at = Column(DateTime, nullable=True, default=None)
 
     totp_items = relationship("TOTPItem", back_populates="user")
 

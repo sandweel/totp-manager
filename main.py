@@ -1,13 +1,18 @@
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+
 from config import engine, Base, templates, settings
-from routes.auth import router as auth_router
+from routes.auth import router as auth_router, get_current_user_if_exists
 from routes.totp import router as totp_router
 from routes.api import router as api_router
+from models import User
+from typing import Optional
+from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)
@@ -17,7 +22,7 @@ app.include_router(api_router)
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
 #    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path in ["/", "/openapi.json", "/docs", "/docs/oauth2-redirect"]:
-    if request.url.path.startswith("/auth") or request.url.path.startswith("/static"):
+    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path.startswith("/docs") or request.url.path == "/openapi.json":
         return await call_next(request)
     token = request.cookies.get("access_token")
     if not token:
@@ -28,8 +33,8 @@ async def auth_middleware(request: Request, call_next):
         return RedirectResponse(url="/auth/login")
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+async def read_root(request: Request, user: Optional[User] = Depends(get_current_user_if_exists)):
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})
 
 
 if __name__ == "__main__":
