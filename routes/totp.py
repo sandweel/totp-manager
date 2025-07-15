@@ -17,20 +17,27 @@ async def get_create(request: Request, user=Depends(get_authenticated_user)):
 
 @router.post("/create", response_class=HTMLResponse)
 async def post_create(request: Request, name: str = Form(...), secret: str = Form(...), user=Depends(get_authenticated_user)):
+    error: str | None = None
+
     if len(name) > 32:
-        flash(request, "Name is too long (max 32 characters).", "error")
-        return RedirectResponse(url="/totp/create", status_code=status.HTTP_303_SEE_OTHER)
+        error = "Name is too long (max 32 characters)."
+    elif not name.strip():
+        error = "Name is required."
+    elif not secret.strip():
+        error = "Secret is required."
 
-    if not name.strip():
-        flash(request, "Name is required.", "error")
-        return RedirectResponse(url="/totp/create", status_code=status.HTTP_303_SEE_OTHER)
-
-    if not secret.strip():
-        flash(request, "Secret is required.", "error")
-        return RedirectResponse(url="/totp/create", status_code=status.HTTP_303_SEE_OTHER)
+    if error:
+        flash(request, error, "error")
+        flash_data = get_flashed_message(request)
+        return templates.TemplateResponse(
+            "totp/create.html",
+            {"request": request, "user": user, "name": name, "flash": flash_data},
+            status_code=status.HTTP_303_SEE_OTHER
+        )
 
     await TotpService.create(name, secret, user)
     flash(request, "TOTP successfully created!", "success")
+    flash_data = get_flashed_message(request)
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/list", response_class=HTMLResponse)
