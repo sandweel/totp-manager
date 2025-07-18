@@ -4,6 +4,7 @@ from config import templates
 from services.flash import flash, get_flashed_message
 from services.totp_service import TotpService
 from routes.auth import get_authenticated_user
+import re
 
 router = APIRouter(prefix="/totp", tags=["totp"])
 
@@ -25,6 +26,11 @@ async def post_create(request: Request, name: str = Form(...), secret: str = For
         error = "Name is required."
     elif not secret.strip():
         error = "Secret is required."
+    else:
+        base32_pattern = re.compile(r'^[A-Z2-7]{16,64}={0,6}$', re.IGNORECASE)
+        secret_clean = secret.strip().replace(" ", "")
+        if not base32_pattern.match(secret_clean):
+            error = "Secret must be a valid Base32 string."
 
     if error:
         flash(request, error, "error")
@@ -37,7 +43,6 @@ async def post_create(request: Request, name: str = Form(...), secret: str = For
 
     await TotpService.create(name, secret, user)
     flash(request, "TOTP successfully created!", "success")
-    flash_data = get_flashed_message(request)
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/list", response_class=HTMLResponse)

@@ -2,33 +2,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('qrcode-file');
   const secretInput = document.getElementById('secret');
   const nameInput = document.getElementById('name');
-  const notificationContainer = document.getElementById('notification-container');
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-  function showNotification(message, type = 'success') {
-    const colors = {
-      success: {
-        bg: 'bg-green-100',
-        border: 'border border-green-400',
-        text: 'text-green-700'
-      },
-      error: {
-        bg: 'bg-red-100',
-        border: 'border border-red-400',
-        text: 'text-red-700'
-      }
-    };
-    const c = colors[type] || colors.success;
+  function showFlash(message, category = 'success') {
+    const containerId = 'toast-container';
+    let container = document.getElementById(containerId);
 
-    notificationContainer.innerHTML = `
-      <div class="${c.bg} ${c.border} ${c.text} px-4 py-3 rounded mb-4">
-        ${message}
-      </div>
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      container.className = 'fixed top-20 inset-x-0 z-50 flex flex-col items-center space-y-4 pointer-events-none';
+      document.body.appendChild(container);
+    }
+
+    const baseClass = 'pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300';
+    const categoryClasses = {
+      success: 'bg-green-100 border border-green-400 text-green-700',
+      error: 'bg-red-100 border border-red-400 text-red-700',
+      info: 'bg-blue-100 border border-blue-400 text-blue-700'
+    };
+    const toastClass = `${baseClass} ${categoryClasses[category] || categoryClasses.info}`;
+
+    const toast = document.createElement('div');
+    toast.className = `${toastClass} translate-y-2 opacity-0`;
+    toast.id = 'toast';
+
+    toast.innerHTML = `
+      <span class="flex-1">${message}</span>
+      <button class="text-xl leading-none focus:outline-none" aria-label="Close">&times;</button>
     `;
 
     setTimeout(() => {
-      notificationContainer.innerHTML = '';
-    }, 10000);
+      toast.classList.remove('translate-y-2', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+    }, 10);
+
+    // Закрытие по кнопке
+    toast.querySelector('button').addEventListener('click', () => {
+      container.removeChild(toast);
+    });
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      if (container.contains(toast)) {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => container.removeChild(toast), 300);
+      }
+    }, 5000);
   }
 
   function parseQRCodeFromImage(img) {
@@ -44,22 +65,22 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const url = new URL(code.data);
         if (url.protocol !== 'otpauth:') throw new Error('Not an otpauth URL');
-        if (url.hostname.toLowerCase() !== 'totp') throw new Error(`Unsupported OTP type: ${url.hostname}. Only TOTP (time-based) is supported.`);
+        if (url.hostname.toLowerCase() !== 'totp') throw new Error('Unsupported OTP type: only TOTP is supported.');
 
         const secretParam = url.searchParams.get('secret');
-        if (!secretParam) throw new Error('Secret not found in QR code');
+        if (!secretParam) throw new Error('Secret not found in QR code.');
 
         secretInput.value = secretParam;
         const label = decodeURIComponent(url.pathname.slice(1));
         if (label) nameInput.value = label;
 
-        showNotification('Secret key and name auto-filled from QR code!', 'success');
+        showFlash('Secret key and name auto-filled from QR code!', 'success');
       } catch (e) {
-        showNotification(e.message || 'Invalid otpauth QR code.', 'error');
+        showFlash(e.message || 'Invalid otpauth QR code.', 'error');
         console.error(e);
       }
     } else {
-      showNotification('No QR code found in the image.', 'error');
+      showFlash('No QR code found in the image.', 'error');
     }
   }
 
@@ -70,11 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = event.target.files[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) {
-        showNotification('Unsupported file type, please upload an image file.', 'error');
+        showFlash('Unsupported file type, please upload an image.', 'error');
         return;
       }
       if (file.size > MAX_FILE_SIZE) {
-        showNotification('File size is too large. Maximum 5 MB.', 'error');
+        showFlash('File is too large. Maximum size is 5MB.', 'error');
         return;
       }
 
@@ -92,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
           if (blob.size > MAX_FILE_SIZE) {
-            showNotification('File size is too large. Maximum 5 MB.', 'error');
+            showFlash('Image is too large. Max 5MB allowed.', 'error');
             return;
           }
 
@@ -109,6 +130,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function bindFormValidation() {
+    const form = document.querySelector('form[action="/totp/create"]');
+    if (!form) return;
+
+    form.addEventListener('submit', (e) => {
+      const name = nameInput.value.trim();
+      const secret = secretInput.value.trim();
+
+      if (!name || name.length > 32) {
+        showFlash('Name is required and must be 32 characters or less.', 'error');
+        e.preventDefault();
+        return;
+      }
+
+      const base32Regex = /^[A-Z2-7]{16,64}={0,6}$/i;
+      if (!base32Regex.test(secret)) {
+        showFlash('Secret must be a valid Base32 string.', 'error');
+        e.preventDefault();
+        return;
+      }
+    });
+  }
+
   function bindSecretSanitizer() {
     if (!secretInput) return;
     secretInput.addEventListener('input', () => {
@@ -118,4 +162,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   bindQRListeners();
   bindSecretSanitizer();
+  bindFormValidation();
 });
