@@ -9,6 +9,7 @@ from typing import Optional
 from config import settings, async_session, templates, master_fernet, http_client
 from models import User
 from services.flash import flash, get_flashed_message
+from services.validator import validate_password
 import uuid
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -59,10 +60,26 @@ async def get_register(request: Request, user: Optional[User] = Depends(get_curr
 
 
 @router.post("/register", response_class=HTMLResponse)
-async def post_register(request: Request, email: str = Form(...), password: str = Form(...),
+async def post_register(request: Request, email: str = Form(...), password: str = Form(...), confirm_password: str = Form(...),
                         user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
+
+    if password != confirm_password:
+        flash(request, "Passwords do not match", "error")
+        flash_data = get_flashed_message(request)
+        return templates.TemplateResponse("auth/register.html",
+                                          {"request": request, "flash": flash_data, "email": email},
+                                          status_code=status.HTTP_303_SEE_OTHER)
+
+    error_msg = validate_password(password)
+    if error_msg:
+        flash(request, error_msg, "error")
+        flash_data = get_flashed_message(request)
+        return templates.TemplateResponse("auth/register.html",
+                                          {"request": request, "flash": flash_data, "email": email},
+                                          status_code=status.HTTP_303_SEE_OTHER)
+
     async with async_session() as session:
         result = await session.execute(select(User).where(User.email == email))
         if result.scalars().first():
@@ -92,8 +109,7 @@ async def post_register(request: Request, email: str = Form(...), password: str 
         print(f"Error sending email: {e}")
         flash(request, "Failed to send confirmation email. Please try again.", "error")
 
-    return RedirectResponse(url="/auth/register", status_code=status.HTTP_303_SEE_OTHER)
-
+    return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/confirm")
 async def confirm_email(request: Request, token: str):
