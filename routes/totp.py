@@ -1,11 +1,16 @@
+from datetime import datetime
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+import io, csv, json
+from typing import List, Optional
+from starlette.responses import StreamingResponse
+
 from config import templates
 from services.flash import flash, get_flashed_message
 from services.totp_service import TotpService
 from routes.auth import get_authenticated_user
 from services.validator import validate_totp
-import re
+from services.ga_export import build_ga_qr_png
 
 router = APIRouter(prefix="/totp", tags=["totp"])
 
@@ -46,3 +51,14 @@ async def delete_item(request: Request, item_id: int, user=Depends(get_authentic
         raise HTTPException(status_code=404, detail="Item not found")
     flash(request, "TOTP deleted successfully.", "success")
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
+
+@router.post("/export")
+async def export_qr(ids: str = Form(...), user=Depends(get_authenticated_user)):
+    id_list = [int(x) for x in ids.split(",") if x]
+    raw_items = await TotpService.export_raw(user, id_list)  # [{'name':..., 'secret':..., ...}, ...]
+
+    png_bytes = build_ga_qr_png(raw_items)
+
+    return StreamingResponse(io.BytesIO(png_bytes),
+                             media_type="image/png",
+                             headers={"Content-Disposition": 'attachment; filename="totp_backup.png"'})

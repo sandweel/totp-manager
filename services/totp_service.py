@@ -1,8 +1,6 @@
-# services/totp_service.py
 import pyotp
 from cryptography.fernet import Fernet
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from config import async_session, master_fernet
 from models import TOTPItem, User
 
@@ -52,3 +50,32 @@ class TotpService:
             await session.delete(item)
             await session.commit()
             return True
+
+    @staticmethod
+    async def export_raw(user: User, ids: list[int]) -> list[dict]:
+        if not ids:
+            return []
+        async with async_session() as session:
+            result = await session.execute(
+                select(TOTPItem).where(
+                    TOTPItem.user_id == user.id,
+                    TOTPItem.id.in_(ids)
+                )
+            )
+            items = result.scalars().all()
+
+        user_dek = master_fernet.decrypt(user.encrypted_dek.encode())
+        user_fernet = Fernet(user_dek)
+
+        out = []
+        for it in items:
+            secret = user_fernet.decrypt(it.encrypted_secret.encode()).decode()
+            out.append({
+                "name": it.name,
+                "secret": secret,
+                "digits": 6,
+                "period": 30,
+                "algorithm": "SHA1",
+                "issuer": ""
+            })
+        return out

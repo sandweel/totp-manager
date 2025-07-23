@@ -1,9 +1,23 @@
-  const RADIUS = 13;
-  const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
-  const PERIOD = 30000;
-  let lastUpdatedCycle = 0;
+const RADIUS = 13;
+const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
+const PERIOD = 30000;
+let lastUpdatedCycle = 0;
 
- async function fetchTotpData() {
+function copyCode(el) {
+  navigator.clipboard.writeText(el.innerText);
+  let msg = document.createElement('span');
+  msg.className = 'absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity';
+  msg.innerText = 'Copied!';
+  el.parentElement.style.position = 'relative';
+  el.parentElement.appendChild(msg);
+  setTimeout(() => msg.classList.add('opacity-100'), 10);
+  setTimeout(() => {
+    msg.classList.remove('opacity-100');
+    setTimeout(() => el.parentElement.removeChild(msg), 200);
+  }, 1600);
+}
+
+async function fetchTotpData() {
   try {
     const resp = await fetch('/api/totp');
     if (!resp.ok) {
@@ -12,7 +26,6 @@
     return await resp.json();
   } catch (err) {
     console.error("Failed to fetch TOTP data:", err);
-
     const rows = document.querySelectorAll("#totp-table tbody tr");
     const errorData = Array.from(rows).map(row => ({
       id: row.getAttribute("data-id"),
@@ -22,58 +35,65 @@
   }
 }
 
-  function updateCodes(data) {
-    const rows = document.querySelectorAll("#totp-table tbody tr");
-    rows.forEach(row => {
-      const id = row.getAttribute("data-id");
-      const item = data.find(el => el.id == id);
-      if (item) {
-        const codeCell = row.querySelector(".code-cell code");
-        if (codeCell.textContent !== item.code) {
-          codeCell.textContent = item.code;
-        }
-        if (item.code === "Error") {
-          codeCell.classList.add("text-red-600");
-        } else {
-          codeCell.classList.remove("text-red-600");
-        }
+function updateCodes(data) {
+  const rows = document.querySelectorAll("#totp-table tbody tr");
+  rows.forEach(row => {
+    const id = row.getAttribute("data-id");
+    const item = data.find(el => el.id == id);
+    if (item) {
+      const codeCell = row.querySelector(".code-cell code");
+      if (codeCell.textContent !== item.code) {
+        codeCell.textContent = item.code;
       }
-    });
-  }
-
-  function animateProgress() {
-    const now = Date.now();
-    const msIntoPeriod = now % PERIOD;
-    const progress = msIntoPeriod / PERIOD;
-    const dashoffset = FULL_DASH_ARRAY * progress;
-
-    document.querySelectorAll('.countdown-ring__progress').forEach(circle => {
-      circle.style.strokeDashoffset = dashoffset;
-    });
-
-    const currentCycle = Math.floor(now / PERIOD);
-    if (currentCycle !== lastUpdatedCycle) {
-      lastUpdatedCycle = currentCycle;
-      fetchTotpData().then(data => {
-        if (data) updateCodes(data);
-      });
+      if (item.code === "Error") {
+        codeCell.classList.add("text-red-600");
+      } else {
+        codeCell.classList.remove("text-red-600");
+      }
     }
+  });
+}
 
-    requestAnimationFrame(animateProgress);
+function animateProgress() {
+  const now = Date.now();
+  const msIntoPeriod = now % PERIOD;
+  const progress = msIntoPeriod / PERIOD;
+  const dashoffset = FULL_DASH_ARRAY * progress;
+
+  document.querySelectorAll('.countdown-ring__progress').forEach(circle => {
+    circle.style.strokeDashoffset = dashoffset;
+  });
+
+  const currentCycle = Math.floor(now / PERIOD);
+  if (currentCycle !== lastUpdatedCycle) {
+    lastUpdatedCycle = currentCycle;
+    fetchTotpData().then(data => {
+      if (data) updateCodes(data);
+    });
   }
 
+  requestAnimationFrame(animateProgress);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
   animateProgress();
 
-    function copyCode(el) {
-      navigator.clipboard.writeText(el.innerText);
-      let msg = document.createElement('span');
-      msg.className = 'absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity';
-      msg.innerText = 'Copied!';
-      el.parentElement.style.position = 'relative';
-      el.parentElement.appendChild(msg);
-      setTimeout(() => msg.classList.add('opacity-100'), 10);
-      setTimeout(() => {
-        msg.classList.remove('opacity-100');
-        setTimeout(() => el.parentElement.removeChild(msg), 200);
-      }, 1600);
-    }
+  const selectAll      = document.getElementById('select-all');
+  const checks         = document.querySelectorAll('.row-check');
+  const exportBtn      = document.getElementById('export-btn');
+  const exportIdsInput = document.getElementById('export-ids');
+
+  function updateExportState() {
+    const ids = Array.from(checks).filter(c => c.checked).map(c => c.value);
+    exportBtn.disabled = ids.length === 0;
+    exportIdsInput.value = ids.join(',');
+  }
+
+  if (selectAll) {
+    selectAll.addEventListener('change', (e) => {
+      checks.forEach(c => { c.checked = e.target.checked; });
+      updateExportState();
+    });
+  }
+  checks.forEach(c => c.addEventListener('change', updateExportState));
+});

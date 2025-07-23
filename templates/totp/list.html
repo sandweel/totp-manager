@@ -11,6 +11,9 @@
     <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
       <thead>
         <tr class="text-sm text-gray-600">
+          <th class="px-4 py-2 text-center">
+            <input type="checkbox" id="select-all" />
+          </th>
           <th class="text-left px-4 py-2">Name</th>
           <th class="text-center px-4 py-2">Current Code</th>
           <th class="text-center px-4 py-2">Time Left</th>
@@ -20,6 +23,9 @@
       <tbody>
         {% for t in totps %}
         <tr class="bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
+          <td class="text-center">
+            <input type="checkbox" class="row-check" value="{{ t.id }}" />
+          </td>
           <td class="px-4 py-3 rounded-l-lg">{{ t.name }}</td>
           <td class="px-4 py-3 text-center code-cell">
             <div class="relative group inline-block">
@@ -37,11 +43,24 @@
               </svg>
             </div>
           </td>
-          <td class="px-4 py-3 text-center rounded-r-lg">
-            <form method="post" action="/totp/{{ t.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this item?');">
+          <td class="px-4 py-3 text-center rounded-r-lg space-x-2">
+            <!-- Delete -->
+            <form method="post" action="/totp/{{ t.id }}/delete"
+                  onsubmit="return confirm('Are you sure you want to delete this item?');"
+                  class="inline">
               <button type="submit"
                       class="bg-danger hover:bg-red-600 text-white py-1.5 px-4 rounded shadow-sm text-sm transition">
                 Delete
+              </button>
+            </form>
+
+            <!-- Single export -->
+            <form method="post" action="/totp/export" class="inline">
+              <input type="hidden" name="ids" value="{{ t.id }}">
+              <button type="submit"
+                      class="bg-blue-500 hover:bg-blue-600 text-white py-1.5 px-3 rounded shadow-sm text-sm transition"
+                      title="Download for Google Authenticator">
+                ⬇
               </button>
             </form>
           </td>
@@ -50,6 +69,16 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Export selected -->
+  <form id="export-selected-form" method="post" action="/totp/export" class="mt-6 flex flex-wrap gap-3 items-center">
+    <input type="hidden" name="ids" id="export-ids">
+    <button type="submit" id="export-btn"
+            class="bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled>
+      Export selected (Google Authenticator)
+    </button>
+  </form>
 </div>
 
 <style>
