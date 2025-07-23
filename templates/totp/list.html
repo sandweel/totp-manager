@@ -3,6 +3,7 @@
 
 {% block content %}
 <script src="/static/js/totp-list.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', path='css/ring.css') }}">
 
 <div class="bg-white shadow-xl rounded-xl p-6">
   <h1 class="text-2xl font-bold text-primary mb-6">🔑 Your Codes</h1>
@@ -80,19 +81,4 @@
     </button>
   </form>
 </div>
-
-<style>
-  .countdown-ring {
-    transform: rotate(-90deg);
-    transform-origin: 50% 50%;
-    display: block;
-    margin: auto;
-  }
-  .countdown-ring__progress {
-    stroke-linecap: round;
-    stroke-dasharray: 81.6814;
-    stroke-dashoffset: 0;
-    transition: stroke-dashoffset 0.1s linear;
-  }
-</style>
 {% endblock %}

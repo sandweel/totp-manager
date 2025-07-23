@@ -1,0 +1,13 @@
+.countdown-ring {
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    display: block;
+    margin: auto;
+}
+
+.countdown-ring__progress {
+    stroke-linecap: round;
+    stroke-dasharray: 81.6814;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.1s linear;
+}
