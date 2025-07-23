@@ -236,6 +236,7 @@ async def reset_password_form(request: Request, token: str,
 
 @router.post("/reset-password/confirm")
 async def reset_password(request: Request, token: str = Form(...), password: str = Form(...),
+                         confirm_password: str = Form(...),
                          user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
@@ -264,6 +265,17 @@ async def reset_password(request: Request, token: str = Form(...), password: str
         if not user.password_reset_token_id or user.password_reset_token_id != reset_id_from_token:
             flash(request, "Invalid or expired reset link. Please try again.", "error")
             return RedirectResponse(url="/auth/reset-password", status_code=302)
+
+        if password != confirm_password:
+            flash(request, "Passwords do not match", "error")
+            flash_data = get_flashed_message(request)
+            return templates.TemplateResponse("auth/reset_password.html", {"request": request, "flash": flash_data, "token": token})
+
+        error_msg = validate_password(password)
+        if error_msg:
+            flash(request, error_msg, "error")
+            flash_data = get_flashed_message(request)
+            return templates.TemplateResponse("auth/reset_password.html", {"request": request, "flash": flash_data, "token": token})
 
         user.hashed_password = pwd_context.hash(password)
         user.password_reset_token_id = None

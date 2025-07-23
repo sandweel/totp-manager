@@ -4,6 +4,7 @@ from config import templates
 from services.flash import flash, get_flashed_message
 from services.totp_service import TotpService
 from routes.auth import get_authenticated_user
+from services.validator import validate_totp
 import re
 
 router = APIRouter(prefix="/totp", tags=["totp"])
@@ -18,22 +19,9 @@ async def get_create(request: Request, user=Depends(get_authenticated_user)):
 
 @router.post("/create", response_class=HTMLResponse)
 async def post_create(request: Request, name: str = Form(...), secret: str = Form(...), user=Depends(get_authenticated_user)):
-    error: str | None = None
-
-    if len(name) > 32:
-        error = "Name is too long (max 32 characters)."
-    elif not name.strip():
-        error = "Name is required."
-    elif not secret.strip():
-        error = "Secret is required."
-    else:
-        base32_pattern = re.compile(r'^[A-Z2-7]{16,64}={0,6}$', re.IGNORECASE)
-        secret_clean = secret.strip().replace(" ", "")
-        if not base32_pattern.match(secret_clean):
-            error = "Secret must be a valid Base32 string."
-
-    if error:
-        flash(request, error, "error")
+    error_msg = validate_totp(name, secret)
+    if error_msg:
+        flash(request, error_msg, "error")
         flash_data = get_flashed_message(request)
         return templates.TemplateResponse(
             "totp/create.html",

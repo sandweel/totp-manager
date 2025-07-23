@@ -3,13 +3,6 @@
   const PERIOD = 30000;
   let lastUpdatedCycle = 0;
 
-  function copyCode(el) {
-
-    navigator.clipboard.writeText(el.textContent).then(() => {
-      alert('Code copied: ' + el.textContent);
-    });
-  }
-
  async function fetchTotpData() {
   try {
     const resp = await fetch('/api/totp');

@@ -2,14 +2,18 @@ import uvicorn
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_422_UNPROCESSABLE_ENTITY
 
-from config import engine, Base, templates, settings
+from config import templates, settings
 from routes.auth import router as auth_router, get_current_user_if_exists
 from routes.totp import router as totp_router
 from routes.api import router as api_router
 from models import User
 from typing import Optional
 from starlette.middleware.sessions import SessionMiddleware
+
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
@@ -31,6 +35,23 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     except:
         return RedirectResponse(url="/auth/login")
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException, user: Optional[User] = Depends(get_current_user_if_exists)):
+    user = await get_current_user_if_exists(request)
+    if exc.status_code == HTTP_404_NOT_FOUND:
+        return templates.TemplateResponse("errors/404.html", {"request": request, "user": user}, status_code=404)
+    raise exc
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    user = await get_current_user_if_exists(request)
+    return templates.TemplateResponse("errors/422.html", {
+        "request": request,
+        "errors": exc.errors(),
+        "user": user,
+    }, status_code=HTTP_422_UNPROCESSABLE_ENTITY)
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, user: Optional[User] = Depends(get_current_user_if_exists)):
