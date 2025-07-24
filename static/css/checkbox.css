@@ -1,0 +1,105 @@
+:root {
+  --cbx45-size:   18px;
+  --cbx45-active: #1E293B;
+  --cbx45-border: #e5e7eb;
+  --cbx45-bg:     #e8e8eb;
+  --cbx45-bw:     2px;
+}
+
+.checkbox-wrapper-45 {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 0;
+}
+
+.checkbox-wrapper-45 input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.checkbox-wrapper-45 .cbx-45 {
+  position: relative;
+  width: calc(var(--cbx45-size) + var(--cbx45-bw)*2);
+  height: calc(var(--cbx45-size) + var(--cbx45-bw)*2);
+  perspective: 400px;
+  display: inline-block;
+  border: var(--cbx45-bw) solid var(--cbx45-border);
+  background: var(--cbx45-bg);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.checkbox-wrapper-45 .cbx-45:hover {
+  border-color: var(--cbx45-active);
+}
+
+.checkbox-wrapper-45 .cbx-45-flip {
+  width: var(--cbx45-size);
+  height: var(--cbx45-size);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+  transition: transform 0.4s ease;
+}
+
+.checkbox-wrapper-45 input[type="checkbox"]:checked + .cbx-45 {
+  border-color: var(--cbx45-active);
+}
+.checkbox-wrapper-45 input[type="checkbox"]:checked + .cbx-45 .cbx-45-flip {
+  transform: translate(-50%, -50%) rotateY(180deg);
+}
+
+.checkbox-wrapper-45 .cbx-45-front,
+.checkbox-wrapper-45 .cbx-45-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-wrapper-45 .cbx-45-front {
+  background: #fff;
+  z-index: 1;
+}
+
+.checkbox-wrapper-45 .cbx-45-back {
+  transform: rotateY(180deg);
+  background: var(--cbx45-active);
+  color: #fff;
+  outline: 1px solid var(--cbx45-active);
+}
+
+.checkbox-wrapper-45 .cbx-45-back svg {
+  width: 70%;
+  height: 70%;
+  fill: none;
+}
+
+.checkbox-wrapper-45 .cbx-45-back svg path {
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.checkbox-wrapper-45 .cbx-45:active .cbx-45-flip {
+  transform: translate(-50%, -50%) scale(0.92) rotateY(var(--rot, 0deg));
+}
+
+.checkbox-wrapper-45 .cbx-45:focus-visible {
+  outline: 2px solid var(--cbx45-active);
+  outline-offset: 2px;
+}

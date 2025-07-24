@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
       toast.classList.add('translate-y-0', 'opacity-100');
     }, 10);
 
-    // Закрытие по кнопке
     toast.querySelector('button').addEventListener('click', () => {
       container.removeChild(toast);
     });

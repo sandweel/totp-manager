@@ -1,11 +1,13 @@
+// --------- Constants for TOTP ring ----------
 const RADIUS = 13;
 const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
 const PERIOD = 30000;
 let lastUpdatedCycle = 0;
 
+// --------- Copy code helper ----------
 function copyCode(el) {
   navigator.clipboard.writeText(el.innerText);
-  let msg = document.createElement('span');
+  const msg = document.createElement('span');
   msg.className = 'absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity';
   msg.innerText = 'Copied!';
   el.parentElement.style.position = 'relative';
@@ -17,43 +19,38 @@ function copyCode(el) {
   }, 1600);
 }
 
+// --------- Fetch & update codes ----------
 async function fetchTotpData() {
   try {
     const resp = await fetch('/api/totp');
-    if (!resp.ok) {
-      throw new Error(`Server error: ${resp.status}`);
-    }
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     return await resp.json();
   } catch (err) {
     console.error("Failed to fetch TOTP data:", err);
     const rows = document.querySelectorAll("#totp-table tbody tr");
-    const errorData = Array.from(rows).map(row => ({
+    return Array.from(rows).map(row => ({
       id: row.getAttribute("data-id"),
       code: "Failed to fetch codes"
     }));
-    return errorData;
   }
 }
 
 function updateCodes(data) {
-  const rows = document.querySelectorAll("#totp-table tbody tr");
-  rows.forEach(row => {
+  document.querySelectorAll("#totp-table tbody tr").forEach(row => {
     const id = row.getAttribute("data-id");
-    const item = data.find(el => el.id == id);
+    const item = data.find(el => String(el.id) === id);
     if (item) {
       const codeCell = row.querySelector(".code-cell code");
-      if (codeCell.textContent !== item.code) {
+      if (codeCell && codeCell.textContent !== item.code) {
         codeCell.textContent = item.code;
       }
-      if (item.code === "Error") {
-        codeCell.classList.add("text-red-600");
-      } else {
-        codeCell.classList.remove("text-red-600");
-      }
+      if (item.code === "Error") codeCell.classList.add("text-red-600");
+      else codeCell.classList.remove("text-red-600");
     }
   });
 }
 
+// --------- Progress ring animation ----------
 function animateProgress() {
   const now = Date.now();
   const msIntoPeriod = now % PERIOD;
@@ -67,33 +64,61 @@ function animateProgress() {
   const currentCycle = Math.floor(now / PERIOD);
   if (currentCycle !== lastUpdatedCycle) {
     lastUpdatedCycle = currentCycle;
-    fetchTotpData().then(data => {
-      if (data) updateCodes(data);
-    });
+    fetchTotpData().then(data => data && updateCodes(data));
   }
 
   requestAnimationFrame(animateProgress);
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+// --------- Export bar logic ----------
+document.addEventListener('DOMContentLoaded', () => {
+  // start ring animation
   animateProgress();
 
-  const selectAll      = document.getElementById('select-all');
-  const checks         = document.querySelectorAll('.row-check');
-  const exportBtn      = document.getElementById('export-btn');
-  const exportIdsInput = document.getElementById('export-ids');
+  const selectAll       = document.getElementById('select-all');
+  const exportBar       = document.getElementById('export-bar');
+  const exportBtn       = document.getElementById('export-btn');
+  const exportIdsInput  = document.getElementById('export-ids');
+  const exportCancel    = document.getElementById('export-cancel');
+
+  function getChecks() {
+    return document.querySelectorAll('.row-check');
+  }
+
+  function toggleExportBar(show) {
+    if (!exportBar) return;
+    if (show) {
+      exportBar.classList.remove('translate-y-full', 'opacity-0');
+    } else {
+      exportBar.classList.add('translate-y-full', 'opacity-0');
+    }
+  }
 
   function updateExportState() {
+    const checks = getChecks();
     const ids = Array.from(checks).filter(c => c.checked).map(c => c.value);
-    exportBtn.disabled = ids.length === 0;
-    exportIdsInput.value = ids.join(',');
+    if (exportBtn) exportBtn.disabled = ids.length === 0;
+    if (exportIdsInput) exportIdsInput.value = ids.join(',');
+    toggleExportBar(ids.length > 0);
   }
 
   if (selectAll) {
     selectAll.addEventListener('change', (e) => {
-      checks.forEach(c => { c.checked = e.target.checked; });
+      getChecks().forEach(c => { c.checked = e.target.checked; });
       updateExportState();
     });
   }
-  checks.forEach(c => c.addEventListener('change', updateExportState));
+
+  getChecks().forEach(c => c.addEventListener('change', updateExportState));
+
+  if (exportCancel) {
+    exportCancel.addEventListener('click', () => {
+      if (selectAll) selectAll.checked = false;
+      getChecks().forEach(c => { c.checked = false; });
+      updateExportState();
+    });
+  }
+
+  // init state
+  updateExportState();
 });
