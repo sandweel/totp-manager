@@ -14,12 +14,12 @@
       <a href="/" class="text-2xl font-bold tracking-wide">🔐 TOTP Manager</a>
       <div class="flex gap-6 text-lg">
         {% if user %}
-          <a href="/totp/create" class="hover:text-primary-hover transition">Create</a>
-          <a href="/totp/list" class="hover:text-primary-hover transition">My TOTPs</a>
-          <a href="/auth/logout" class="hover:text-primary-hover transition">Logout</a>
+          <a href="/totp/create" class="hover:text-primary-text-hover transition">Create</a>
+          <a href="/totp/list" class="hover:text-primary-text-hover transition">My TOTPs</a>
+          <a href="/auth/logout" class="hover:text-primary-text-hover transition">Logout</a>
         {% else %}
-          <a href="/auth/login" class="hover:text-primary-hover transition">Login</a>
-          <a href="/auth/register" class="hover:text-primary-hover transition">Register</a>
+          <a href="/auth/login" class="hover:text-primary-text-hover transition">Login</a>
+          <a href="/auth/register" class="hover:text-primary-text-hover transition">Register</a>
         {% endif %}
       </div>
     </div>
@@ -33,15 +33,19 @@
        class="fixed inset-0 z-40 bg-black bg-opacity-10 backdrop-blur-sm hidden">
   </div>
 
-  <div id="toast-container" class="fixed top-20 inset-x-0 z-50 flex flex-col items-center space-y-4 pointer-events-none">
+  <div id="toast-container" class="fixed top-24 inset-x-0 z-50 flex flex-col items-center space-y-4 pointer-events-none">
     {% if flash %}
-      {% set base = "pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300" %}
+      {% set base = "pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300 border" %}
       {% if flash.category == "success" %}
-        {% set cls = base ~ " bg-green-100 border border-green-400 text-green-700" %}
+        {% set cls = base ~ " bg-success/10 border-success text-success" %}
       {% elif flash.category == "error" %}
-        {% set cls = base ~ " bg-red-100 border border-red-400 text-red-700" %}
+        % set cls = base ~ " bg-danger/10 border-danger text-danger" %}
+      {% elif flash.category == "warning" %}
+        {% set cls = base ~ " bg-warning/10 border-warning text-warning" %}
+      {% elif flash.category == "info" %}
+        {% set cls = base ~ " bg-info/10 border-info text-info" %}
       {% else %}
-        {% set cls = base ~ " bg-blue-100 border border-blue-400 text-blue-700" %}
+        {% set cls = base ~ " bg-primary-light text-primary-text" %}
       {% endif %}
       <div id="toast" class="{{ cls }} translate-y-2 opacity-0">
         <span class="flex-1">{{ flash.message }}</span>
@@ -49,10 +53,6 @@
       </div>
     {% endif %}
   </div>
-
-  <script>
-
-  </script>
 
 </body>
 </html>
