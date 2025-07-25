@@ -3,7 +3,6 @@
 {% block content %}
 <div class="bg-white shadow-xl rounded-xl p-6 max-w-lg mx-auto">
   <h1 class="text-2xl font-bold text-primary mb-6">Login</h1>
-
   <form method="post" action="/auth/login">
     <div class="mb-4">
       <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -14,11 +13,10 @@
       <input type="password" id="password" name="password" required class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
     </div>
     <div class="flex justify-between items-center mb-6">
-      <button type="submit" class="bg-primary hover:bg-blue-700 text-white px-5 py-2 rounded-md">Login</button>
-      <a href="/auth/reset-password" class="text-sm text-blue-600 hover:underline">Forgot password?</a>
+      <button type="submit" class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md">Login</button>
+      <a href="/auth/reset-password" class="text-info hover:underline text-sm">Forgot password?</a>
     </div>
   </form>
-
-  <p class="text-sm text-gray-600">Don't have an account? <a href="/auth/register" class="text-blue-600 hover:underline">Register here</a></p>
+  <p class="text-sm text-gray-600">Don't have an account? <a href="/auth/register" class="text-info hover:underline">Register here</a></p>
 </div>
 {% endblock %}

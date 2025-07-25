@@ -55,7 +55,7 @@ async def delete_item(request: Request, item_id: int, user=Depends(get_authentic
 @router.post("/export")
 async def export_qr(ids: str = Form(...), user=Depends(get_authenticated_user)):
     id_list = [int(x) for x in ids.split(",") if x]
-    raw_items = await TotpService.export_raw(user, id_list)  # [{'name':..., 'secret':..., ...}, ...]
+    raw_items = await TotpService.export_raw(user, id_list)
 
     png_bytes = build_ga_qr_png(raw_items)
 

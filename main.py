@@ -26,7 +26,7 @@ app.include_router(api_router)
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
 #    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path in ["/", "/openapi.json", "/docs", "/docs/oauth2-redirect"]:
-    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path.startswith("/docs") or request.url.path == "/openapi.json":
+    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path.startswith("/docs") or request.url.path in ["/", "/openapi.json"]:
         return await call_next(request)
     token = request.cookies.get("access_token")
     if not token:

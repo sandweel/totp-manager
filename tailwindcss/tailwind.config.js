@@ -1,4 +1,5 @@
 /** @type {import('tailwindcss').Config} */
+const colors = require('tailwindcss/colors')
 module.exports = {
   content: [
     '../templates/**/*.html',
@@ -17,12 +18,11 @@ module.exports = {
         'primary-light': '#334155',
         'primary-text': '#f1f5f9',
         'primary-text-hover': '#94A3B8',
-//        'primary-hover': '#cbd5e1',
-        'primary-hover': '#94a2b7',
-        danger: '#ef4444',
-        success: '#22c55e',
-        warning: '#f59e0b',
-        info: '#3b82f6',
+        'primary-hover': '#4B5462',
+        danger: colors.red,
+        success: colors.green,
+        warning: colors.amber,
+        info:    colors.blue,
       },
     },
   },
