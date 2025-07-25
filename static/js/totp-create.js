@@ -14,10 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const baseClass = "pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300 border";
     const categoryClasses = {
-      success: baseClass + " bg-success/10 border-success text-success",
-      error: baseClass + " bg-danger/10 border-danger text-danger",
-      warning: baseClass + " bg-warning/10 border-warning text-warning",
-      info: baseClass + " bg-info/10 border-info text-info",
+      success: baseClass + " bg-success-200 border-success-500 text-success-700",
+      error: baseClass + " bg-danger-200 border-danger-500 text-danger-700",
+      warning: baseClass + " bg-warning-200 border-warning-500 text-warning-700",
+      info: baseClass + " bg-info-200 border-info-500 text-info-700",
     };
     const toast = document.createElement("div");
     toast.className = `${categoryClasses[category] || categoryClasses.info} translate-y-2 opacity-0`;

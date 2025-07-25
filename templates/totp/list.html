@@ -32,7 +32,7 @@
       </thead>
       <tbody>
         {% for t in totps %}
-        <tr class="bg-gray-50 hover:bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
+        <tr class="bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
           <td class="text-center align-middle">
             <div class="checkbox-wrapper-45">
               <input id="cbx-{{ t.id }}" type="checkbox" class="row-check" value="{{ t.id }}" />
@@ -80,10 +80,7 @@
         action="/totp/export"
         class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
     <input type="hidden" name="ids" id="export-ids">
-    <button type="button" id="export-btn"
-            class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md">
-      Export selected
-    </button>
+    <button type="button" id="export-btn" class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md">Export selected</button>
     <button type="button" id="export-cancel"
             class="text-gray-500 hover:text-gray-700 text-sm">
       Cancel
