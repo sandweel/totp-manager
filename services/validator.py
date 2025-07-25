@@ -14,15 +14,18 @@ def validate_password(password: str) -> Optional[str]:
         return "Password must contain at least one special character"
     return None
 
+def validate_totp(account: str, issuer: str, secret: str) -> Optional[str]:
+    if not account.strip():
+        return "Account is required."
+    if len(account) > 32:
+        return "Account is too long (max 32 characters)."
+    if not issuer.strip():
+        return "Issuer is required."
+    if len(issuer) > 32:
+        return "Issuer is too long (max 32 characters)."
 
-def validate_totp(name: str, secret: str) -> Optional[str]:
-    if not name.strip():
-        return "Name is required."
-    if len(name) > 32:
-        return "Name is too long (max 32 characters)."
     if not secret.strip():
         return "Secret is required."
-
     secret_clean = secret.strip().replace(" ", "")
     base32_pattern = re.compile(r'^[A-Z2-7]{16,64}={0,6}$', re.IGNORECASE)
     if not base32_pattern.match(secret_clean):

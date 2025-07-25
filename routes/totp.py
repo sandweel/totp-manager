@@ -1,8 +1,7 @@
-from datetime import datetime
+
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-import io, csv, json
-from typing import List, Optional
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+import io
 from starlette.responses import StreamingResponse
 
 from config import templates
@@ -23,18 +22,17 @@ async def get_create(request: Request, user=Depends(get_authenticated_user)):
     )
 
 @router.post("/create", response_class=HTMLResponse)
-async def post_create(request: Request, name: str = Form(...), secret: str = Form(...), user=Depends(get_authenticated_user)):
-    error_msg = validate_totp(name, secret)
+async def post_create(request: Request, account: str = Form(...), issuer: str = Form(...), secret: str = Form(...), user=Depends(get_authenticated_user)):
+    error_msg = validate_totp(account, issuer, secret)
     if error_msg:
         flash(request, error_msg, "error")
         flash_data = get_flashed_message(request)
         return templates.TemplateResponse(
             "totp/create.html",
-            {"request": request, "user": user, "name": name, "flash": flash_data},
-            status_code=status.HTTP_303_SEE_OTHER
+            {"request": request, "user": user, "account": account, "issuer": issuer, "flash": flash_data}, status_code=status.HTTP_303_SEE_OTHER
         )
 
-    await TotpService.create(name, secret, user)
+    await TotpService.create(account, issuer, secret, user)
     flash(request, "TOTP successfully created!", "success")
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
 
@@ -52,13 +50,17 @@ async def delete_item(request: Request, item_id: int, user=Depends(get_authentic
     flash(request, "TOTP deleted successfully.", "success")
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
 
+@router.get("/list-all")
+async def api_totp_list(user=Depends(get_authenticated_user)):
+    totps = await TotpService.list_all(user)
+    return JSONResponse(content=[
+        {"id": t["id"], "account": t["account"], "issuer": t["issuer"], "code": t["code"]}
+        for t in totps
+    ])
+
 @router.post("/export")
 async def export_qr(ids: str = Form(...), user=Depends(get_authenticated_user)):
     id_list = [int(x) for x in ids.split(",") if x]
     raw_items = await TotpService.export_raw(user, id_list)
-
     png_bytes = build_ga_qr_png(raw_items)
-
-    return StreamingResponse(io.BytesIO(png_bytes),
-                             media_type="image/png",
-                             headers={"Content-Disposition": 'attachment; filename="totp_backup.png"'})
+    return StreamingResponse(io.BytesIO(png_bytes), media_type="image/png", headers={"Content-Disposition": 'attachment; filename="totp_backup.png"'})

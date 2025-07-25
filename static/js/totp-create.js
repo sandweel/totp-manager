@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const fileInput = document.getElementById("qrcode-file");
-  const secretInput = document.getElementById("secret");
-  const nameInput = document.getElementById("name");
+  const fileInput    = document.getElementById("qrcode-file");
+  const secretInput  = document.getElementById("secret");
+  const accountInput = document.getElementById("account");
+  const issuerInput  = document.getElementById("issuer");
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
   function showFlash(message, category = "success") {
     const containerId = "toast-container";
@@ -15,9 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const baseClass = "pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 transform transition-all duration-300 border";
     const categoryClasses = {
       success: baseClass + " bg-success-200 border-success-500 text-success-700",
-      error: baseClass + " bg-danger-200 border-danger-500 text-danger-700",
+      error:   baseClass + " bg-danger-200 border-danger-500 text-danger-700",
       warning: baseClass + " bg-warning-200 border-warning-500 text-warning-700",
-      info: baseClass + " bg-info-200 border-info-500 text-info-700",
+      info:    baseClass + " bg-info-200 border-info-500 text-info-700",
     };
     const toast = document.createElement("div");
     toast.className = `${categoryClasses[category] || categoryClasses.info} translate-y-2 opacity-0`;
@@ -42,31 +43,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function parseQRCodeFromImage(img) {
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = img.naturalWidth || img.width;
+    const ctx    = canvas.getContext("2d");
+    canvas.width  = img.naturalWidth || img.width;
     canvas.height = img.naturalHeight || img.height;
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, canvas.width, canvas.height);
-    if (code) {
-      try {
-        const url = new URL(code.data);
-        if (url.protocol !== "otpauth:") throw new Error("Not an otpauth URL");
-        if (url.hostname.toLowerCase() !== "totp") throw new Error("Only TOTP is supported");
-        const secretParam = url.searchParams.get("secret");
-        if (!secretParam) throw new Error("Secret not found in QR code.");
-        secretInput.value = secretParam;
-        const label = decodeURIComponent(url.pathname.slice(1));
-        if (label) nameInput.value = label;
-        showFlash("Secret key and name auto-filled from QR code!", "success");
-      } catch (e) {
-        showFlash(e.message || "Invalid otpauth QR code.", "error");
-        console.error(e);
-      }
-    } else {
+    const code      = jsQR(imageData.data, canvas.width, canvas.height);
+    if (!code) {
       showFlash("No QR code found in the image.", "error");
+      return;
+    }
+
+    try {
+      const url = new URL(code.data);
+      if (url.protocol !== "otpauth:") throw new Error("Not an otpauth URL");
+      if (url.hostname.toLowerCase() !== "totp") throw new Error("Only TOTP is supported");
+
+      const params = url.searchParams;
+      const secret = params.get("secret");
+      if (!secret) throw new Error("Secret not found in QR code.");
+
+      const label = decodeURIComponent(url.pathname.slice(1));
+      let [qrIssuer, qrAccount] = label.split(":");
+      if (!qrAccount) {
+        qrAccount = qrIssuer;
+        qrIssuer  = params.get("issuer") || "";
+      }
+
+      secretInput.value  = secret;
+      issuerInput.value  = qrIssuer;
+      accountInput.value = qrAccount;
+
+      showFlash("Account, Issuer and secret auto‑filled from QR code!", "success");
+
+    } catch (e) {
+      showFlash(e.message || "Invalid otpauth QR code.", "error");
+      console.error(e);
     }
   }
+
   function bindQRListeners() {
     if (!fileInput) return;
     fileInput.addEventListener("change", (event) => {
@@ -112,10 +127,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector('form[action="/totp/create"]');
     if (!form) return;
     form.addEventListener("submit", (e) => {
-      const name = nameInput.value.trim();
-      const secret = secretInput.value.trim();
-      if (!name || name.length > 32) {
-        showFlash("Name is required and must be 32 characters or less.", "error");
+      const account = accountInput.value.trim();
+      const issuer  = issuerInput.value.trim();
+      const secret  = secretInput.value.trim();
+
+      if (!account || account.length > 64) {
+        showFlash("Account is required and must be 64 characters or less.", "error");
+        e.preventDefault();
+        return;
+      }
+      if (!issuer || issuer.length > 64) {
+        showFlash("Issuer is required and must be 64 characters or less.", "error");
         e.preventDefault();
         return;
       }

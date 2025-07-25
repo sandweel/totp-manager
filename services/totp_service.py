@@ -1,17 +1,18 @@
 import pyotp
 from cryptography.fernet import Fernet
 from sqlalchemy import select
+
 from config import async_session, master_fernet
 from models import TOTPItem, User
 
 class TotpService:
     @staticmethod
-    async def create(name: str, secret: str, user: User) -> TOTPItem:
+    async def create(account: str, issuer: str, secret: str, user: User) -> TOTPItem:
         user_dek = master_fernet.decrypt(user.encrypted_dek.encode())
         user_fernet = Fernet(user_dek)
         encrypted_secret = user_fernet.encrypt(secret.encode()).decode()
         async with async_session() as session:
-            item = TOTPItem(name=name, encrypted_secret=encrypted_secret, user_id=user.id)
+            item = TOTPItem(account=account, issuer=issuer, encrypted_secret=encrypted_secret, user_id=user.id)
             session.add(item)
             await session.commit()
             await session.refresh(item)
@@ -32,7 +33,7 @@ class TotpService:
                 code = totp.now()
             except Exception:
                 code = "Error"
-            output.append({"id": item.id, "name": item.name, "code": code})
+            output.append({"id": item.id, "account": item.account, "issuer": item.issuer, "code": code})
         return output
 
     @staticmethod
@@ -71,11 +72,11 @@ class TotpService:
         for it in items:
             secret = user_fernet.decrypt(it.encrypted_secret.encode()).decode()
             out.append({
-                "name": it.name,
+                "account": it.account,
+                "issuer": it.issuer,
                 "secret": secret,
                 "digits": 6,
                 "period": 30,
-                "algorithm": "SHA1",
-                "issuer": ""
+                "algorithm": "SHA1"
             })
         return out

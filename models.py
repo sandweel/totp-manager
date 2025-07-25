@@ -20,7 +20,8 @@ class TOTPItem(Base):
     __tablename__ = "totp_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(128), nullable=False)
+    issuer = Column(String(128), nullable=False)
+    account = Column(String(128), nullable=False)
     encrypted_secret = Column(String(256), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 

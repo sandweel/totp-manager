@@ -13,7 +13,7 @@ function copyCode(el) {
 }
 async function fetchTotpData() {
   try {
-    const resp = await fetch("/api/totp");
+    const resp = await fetch("/totp/list-all");
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     return await resp.json();
   } catch (err) {
