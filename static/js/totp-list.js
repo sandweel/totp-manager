@@ -61,13 +61,46 @@ function animateProgress() {
   }
   requestAnimationFrame(animateProgress);
 }
+function showQrModalFromBlob(blob) {
+  const url = URL.createObjectURL(blob);
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  `;
+  overlay.addEventListener("click", () => {
+    URL.revokeObjectURL(url);
+    document.body.removeChild(overlay);
+  });
+
+  const img = document.createElement("img");
+  img.src = url;
+  img.style.cssText = `
+    max-width: 90%;
+    max-height: 90%;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  `;
+  img.addEventListener("click", (e) => e.stopPropagation());
+
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   animateProgress();
-  const selectAll = document.getElementById("select-all");
-  const exportBar = document.getElementById("export-bar");
-  const exportBtn = document.getElementById("export-btn");
+
+  const selectAll      = document.getElementById("select-all");
+  const exportBar      = document.getElementById("export-bar");
+  const exportBtn      = document.getElementById("export-btn");
   const exportIdsInput = document.getElementById("export-ids");
-  const exportCancel = document.getElementById("export-cancel");
+  const exportCancel   = document.getElementById("export-cancel");
+
   function getChecks() {
     return document.querySelectorAll(".row-check");
   }
@@ -81,34 +114,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function updateExportState() {
     const checks = getChecks();
-    const ids = Array.from(checks).filter((c) => c.checked).map((c) => c.value);
-    if (exportBtn) {
-      exportBtn.disabled = ids.length === 0;
-      exportBtn.classList.toggle("opacity-50", ids.length === 0);
-      exportBtn.classList.toggle("cursor-not-allowed", ids.length === 0);
-    }
-    if (exportIdsInput) {
-      exportIdsInput.value = ids.join(",");
-    }
+    const ids = Array.from(checks).filter(c => c.checked).map(c => c.value);
+    exportBtn.disabled = ids.length === 0;
+    exportBtn.classList.toggle("opacity-50", ids.length === 0);
+    exportBtn.classList.toggle("cursor-not-allowed", ids.length === 0);
+    exportIdsInput.value = ids.join(",");
     toggleExportBar(ids.length > 0);
   }
+
   if (selectAll) {
-    selectAll.addEventListener("change", (e) => {
-      getChecks().forEach((c) => {
-        c.checked = e.target.checked;
-      });
+    selectAll.addEventListener("change", e => {
+      getChecks().forEach(c => c.checked = e.target.checked);
       updateExportState();
     });
   }
-  getChecks().forEach((c) => c.addEventListener("change", updateExportState));
+  getChecks().forEach(c => c.addEventListener("change", updateExportState));
+
   if (exportCancel) {
     exportCancel.addEventListener("click", () => {
       if (selectAll) selectAll.checked = false;
-      getChecks().forEach((c) => {
-        c.checked = false;
-      });
+      getChecks().forEach(c => c.checked = false);
       updateExportState();
     });
   }
+  exportBtn.addEventListener("click", async () => {
+    const form = document.getElementById("export-selected-form");
+    const formData = new FormData(form);
+    try {
+      const res = await fetch(form.action, {
+        method: form.method,
+        body: formData,
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const blob = await res.blob();
+      showQrModalFromBlob(blob);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load QR code!');
+    }
+  });
+
   updateExportState();
 });

@@ -47,7 +47,7 @@
           <td class="px-4 py-3 rounded-l-lg text-gray-800">{{ t.name }}</td>
           <td class="px-4 py-3 text-center align-middle code-cell">
             <div class="relative group inline-block">
-              <code onclick="copyCode(this)" class="cursor-pointer bg-blue-50 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-blue-100 transition">
+              <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-info-300 transition">
                 {{ t.code }}
               </code>
             </div>
@@ -56,13 +56,13 @@
             <div class="flex justify-center items-center h-full">
               <svg width="32" height="32" viewBox="0 0 36 36" class="countdown-ring text-info">
                 <circle class="countdown-ring__bg" stroke="#e5e7eb" stroke-width="3" fill="transparent" r="13" cx="18" cy="18"/>
-                <circle class="countdown-ring__progress" stroke="currentColor" stroke-width="3" fill="transparent" r="13" cx="18" cy="18" stroke-linecap="round" stroke-dasharray="81.6814" stroke-dashoffset="0"/>
+                <circle class="countdown-ring__progress" stroke="#3B82F6" stroke-width="3" fill="transparent" r="13" cx="18" cy="18" stroke-linecap="round" stroke-dasharray="81.6814" stroke-dashoffset="0"/>
               </svg>
             </div>
           </td>
           <td class="px-4 py-3 text-center rounded-r-lg">
             <form method="post" action="/totp/{{ t.id }}/delete" onsubmit="return confirm('Are you sure?');" class="inline">
-              <button type="submit" class="bg-danger hover:bg-danger/90 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">Delete</button>
+              <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">Delete</button>
             </form>
           </td>
         </tr>
@@ -73,11 +73,21 @@
 </div>
 
 <!-- Export Bar -->
-<div id="export-bar" class="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-6 pointer-events-none transform translate-y-full opacity-0 transition-all duration-300">
-  <form id="export-selected-form" method="post" action="/totp/export" target="_blank" class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
+<div id="export-bar"
+     class="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-6 pointer-events-none transform translate-y-full opacity-0 transition-all duration-300">
+  <form id="export-selected-form"
+        method="post"
+        action="/totp/export"
+        class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
     <input type="hidden" name="ids" id="export-ids">
-    <button type="submit" id="export-btn" class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md">Export selected</button>
-    <button type="button" id="export-cancel" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+    <button type="button" id="export-btn"
+            class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md">
+      Export selected
+    </button>
+    <button type="button" id="export-cancel"
+            class="text-gray-500 hover:text-gray-700 text-sm">
+      Cancel
+    </button>
   </form>
 </div>
 {% endblock %}
