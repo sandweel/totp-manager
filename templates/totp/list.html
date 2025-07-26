@@ -2,12 +2,15 @@
 {% block title %}Your TOTP Codes{% endblock %}
 
 {% block content %}
-<script src="/static/js/totp-list.js"></script>
+<script src="{{ url_for('static', path='js/totp-list.js') }}"></script>
 <link rel="stylesheet" href="{{ url_for('static', path='css/ring.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', path='css/checkbox.css') }}">
 
+<div class="flex justify-between items-center max-w-5xl mx-auto mb-4">
+  <h1 class="text-2xl font-bold text-primary">🔑 Your Codes</h1>
+  <button id="import-btn" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-md">Import</button>
+</div>
 <div class="bg-white shadow-xl rounded-xl p-6 max-w-5xl mx-auto">
-  <h1 class="text-2xl font-bold text-primary mb-6">🔑 Your Codes</h1>
   <div class="overflow-x-auto">
     <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
       <thead>
@@ -18,7 +21,7 @@
               <label class="cbx-45" for="select-all">
                 <div class="cbx-45-flip">
                   <div class="cbx-45-front"></div>
-                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"></path></svg></div>
+                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
                 </div>
               </label>
             </div>
@@ -38,7 +41,7 @@
               <label class="cbx-45" for="cbx-{{ t.id }}">
                 <div class="cbx-45-flip">
                   <div class="cbx-45-front"></div>
-                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"></path></svg></div>
+                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
                 </div>
               </label>
             </div>
@@ -65,8 +68,11 @@
             </div>
           </td>
           <td class="px-4 py-3 text-center rounded-r-lg">
-            <form method="post" action="/totp/{{ t.id }}/delete" onsubmit="return confirm('Are you sure?');" class="inline">
-              <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">Delete</button>
+            <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
+              <input type="hidden" name="ids" value="{{ t.id }}">
+              <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
+                Delete
+              </button>
             </form>
           </td>
         </tr>
@@ -76,16 +82,37 @@
   </div>
 </div>
 
-<!-- Export Bar -->
 <div id="export-bar"
      class="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-6 pointer-events-none transform translate-y-full opacity-0 transition-all duration-300">
-  <form id="export-selected-form"
-        method="post"
-        action="/totp/export"
-        class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
-    <input type="hidden" name="ids" id="export-ids">
-    <button type="button" id="export-btn" class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md">Export selected</button>
+  <div class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
+    <form id="export-selected-form" method="post" action="/totp/export" class="flex items-center gap-4">
+      <input type="hidden" name="ids" id="export-ids">
+      <button type="button" id="export-btn"
+              class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed"
+              disabled>
+        Export selected
+      </button>
+    </form>
+
+    <form id="delete-selected-form" method="post" action="/totp/delete" class="flex items-center gap-4">
+      <input type="hidden" name="ids" id="delete-ids">
+      <button type="submit" id="delete-selected-btn" class="bg-danger-500 hover:bg-danger-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" onclick="return confirm('Are you sure you want to delete selected item(s)?');" disabled>Delete selected</button>
+    </form>
+
     <button type="button" id="export-cancel" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
-  </form>
+  </div>
+</div>
+
+<div id="import-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+  <div class="bg-white rounded-lg p-6 w-96">
+    <h2 class="text-xl font-semibold mb-4">Import TOTP URI(s)</h2>
+    <form id="import-form" method="post" action="/totp/import">
+      <textarea id="import-text" name="uri" class="w-full border rounded p-2 mb-4" placeholder="Paste otpauth://… or migration URI here"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="import-cancel" class="px-4 py-2">Cancel</button>
+        <button type="submit" class="bg-primary text-white px-4 py-2 rounded">Import</button>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}

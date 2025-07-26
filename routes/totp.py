@@ -42,12 +42,26 @@ async def get_list(request: Request, user=Depends(get_authenticated_user)):
     flash_data = get_flashed_message(request)
     return templates.TemplateResponse("totp/list.html", {"request": request, "totps": totps, "user": user, "flash": flash_data})
 
-@router.post("/{item_id}/delete", response_class=RedirectResponse)
-async def delete_item(request: Request, item_id: int, user=Depends(get_authenticated_user)):
-    deleted = await TotpService.delete(item_id, user)
-    if not deleted:
+@router.post("/delete", response_class=RedirectResponse)
+async def delete_items(request: Request, ids: str = Form(...), user=Depends(get_authenticated_user)):
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid item ids")
+
+    deleted_count = 0
+    for item_id in id_list:
+        if await TotpService.delete(item_id, user):
+            deleted_count += 1
+
+    if len(id_list) == 1 and deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
-    flash(request, "TOTP deleted successfully.", "success")
+
+    if deleted_count:
+        flash(request, f"Deleted {deleted_count} item(s).", "success")
+    else:
+        flash(request, "No items were deleted.", "error")
+
     return RedirectResponse(router.url_path_for("get_list"), status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/list-all")
