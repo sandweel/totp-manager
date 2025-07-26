@@ -72,11 +72,10 @@ class TotpService:
         for it in items:
             secret = user_fernet.decrypt(it.encrypted_secret.encode()).decode()
             out.append({
-                "account": it.account,
                 "issuer": it.issuer,
+                "account": it.account,
                 "secret": secret,
                 "digits": 6,
-                "period": 30,
                 "algorithm": "SHA1"
             })
         return out
