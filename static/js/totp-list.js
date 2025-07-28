@@ -12,14 +12,15 @@ function copyCode(el) {
   }, 1600);
 }
 
-async function fetchTotpData() {
+async function fetchTotpData(endpoint = "/totp/list-all") {
   try {
-    const resp = await fetch("/totp/list-all");
+    const resp = await fetch(endpoint);
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     return await resp.json();
   } catch (err) {
     console.error("Failed to fetch TOTP data:", err);
-    const rows = document.querySelectorAll("#totp-table tbody tr");
+    const tableId = endpoint === "/totp/list-all" ? "#totp-table" : "#shared-totp-table";
+    const rows = document.querySelectorAll(`${tableId} tbody tr`);
     return Array.from(rows).map(row => ({
       id: row.getAttribute("data-id"),
       code: "Failed to fetch codes"
@@ -27,8 +28,8 @@ async function fetchTotpData() {
   }
 }
 
-function updateCodes(data) {
-  document.querySelectorAll("#totp-table tbody tr").forEach(row => {
+function updateCodes(data, tableId = "#totp-table") {
+  document.querySelectorAll(`${tableId} tbody tr`).forEach(row => {
     const id = row.getAttribute("data-id");
     const item = data.find(el => String(el.id) === id);
     if (item) {
@@ -56,7 +57,8 @@ function animateProgress() {
   const currentCycle = Math.floor(now / PERIOD);
   if (currentCycle !== lastUpdatedCycle) {
     lastUpdatedCycle = currentCycle;
-    fetchTotpData().then(data => data && updateCodes(data));
+    fetchTotpData("/totp/list-all").then(data => data && updateCodes(data, "#totp-table"));
+    fetchTotpData("/totp/list-shared-with-me").then(data => data && updateCodes(data, "#shared-totp-table"));
   }
   requestAnimationFrame(animateProgress);
 }
@@ -90,16 +92,90 @@ function showQrModalFromBlob(blob) {
   document.body.appendChild(overlay);
 }
 
+async function showSharedUsers(totpId) {
+  const modal = document.getElementById("shared-users-modal");
+  const list = document.getElementById("shared-users-list");
+  list.innerHTML = "<p>Loading...</p>";
+  modal.classList.remove("hidden");
+
+  try {
+    const resp = await fetch(`/totp/shared-users/${totpId}`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      list.innerHTML = `<p>${data.message || "Error loading shared users."}</p>`;
+      return;
+    }
+    list.innerHTML = data.emails.length
+      ? data.emails.map(email => `
+          <div class="flex justify-between items-center mb-2">
+            <span>${email}</span>
+            <button onclick="unshareTotp(${totpId}, '${email}')" class="text-danger-500 hover:text-danger-700">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        `).join("")
+      : "<p>No users shared with.</p>";
+  } catch (err) {
+    console.error(err);
+    list.innerHTML = "<p>Error loading shared users.</p>";
+  }
+}
+
+async function unshareTotp(totpId, email) {
+  const formData = new FormData();
+  formData.append("totp_id", totpId);
+  formData.append("email", email);
+  try {
+    const resp = await fetch("/totp/unshare", {
+      method: "POST",
+      body: formData,
+      credentials: "same-origin"
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      showSharedUsers(totpId);
+      const row = document.querySelector(`#totp-table tr[data-id="${totpId}"]`);
+      if (row && !data.emails?.length) {
+        const sharedBtn = row.querySelector(".shared-btn");
+        if (sharedBtn) sharedBtn.remove();
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function addSharedButton(totpId) {
+  const row = document.querySelector(`#totp-table tr[data-id="${totpId}"]`);
+  if (row && !row.querySelector(".shared-btn")) {
+    const actions = row.querySelector("td:last-child div");
+    const sharedBtn = document.createElement("button");
+    sharedBtn.className = "bg-info-500 hover:bg-info-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn";
+    sharedBtn.textContent = "Shared";
+    sharedBtn.onclick = () => showSharedUsers(totpId);
+    actions.appendChild(sharedBtn);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   animateProgress();
 
-  const selectAll      = document.getElementById("select-all");
-  const exportBar      = document.getElementById("export-bar");
-  const exportBtn      = document.getElementById("export-btn");
-  const deleteBtn      = document.getElementById("delete-selected-btn");
+  const selectAll = document.getElementById("select-all");
+  const exportBar = document.getElementById("export-bar");
+  const exportBtn = document.getElementById("export-btn");
+  const deleteBtn = document.getElementById("delete-selected-btn");
+  const shareBtn = document.getElementById("share-btn");
   const exportIdsInput = document.getElementById("export-ids");
   const deleteIdsInput = document.getElementById("delete-ids");
-  const exportCancel   = document.getElementById("export-cancel");
+  const shareIdsInput = document.getElementById("share-ids");
+  const exportCancel = document.getElementById("export-cancel");
+
+  const myCodesTab = document.getElementById("my-codes-tab");
+  const sharedWithMeTab = document.getElementById("shared-with-me-tab");
+  const myCodesContent = document.getElementById("my-codes");
+  const sharedWithMeContent = document.getElementById("shared-with-me");
 
   function toggleExportBar(show) {
     exportBar.classList.toggle("translate-y-full", !show);
@@ -108,15 +184,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function updateExportState() {
     const ids = Array.from(document.querySelectorAll(".row-check"))
-                     .filter(c => c.checked)
-                     .map(c => c.value)
-                     .join(",");
+      .filter(c => c.checked)
+      .map(c => c.value)
+      .join(",");
 
     exportIdsInput.value = ids;
     deleteIdsInput.value = ids;
+    shareIdsInput.value = ids;
 
     const any = ids.length > 0;
-    [exportBtn, deleteBtn].forEach(btn => {
+    [exportBtn, deleteBtn, shareBtn].forEach(btn => {
       btn.disabled = !any;
       btn.classList.toggle("opacity-50", !any);
       btn.classList.toggle("cursor-not-allowed", !any);
@@ -132,6 +209,30 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".row-check").forEach(c => c.addEventListener("change", updateExportState));
 
   exportCancel.addEventListener("click", () => {
+    selectAll.checked = false;
+    document.querySelectorAll(".row-check").forEach(c => c.checked = false);
+    updateExportState();
+  });
+
+  myCodesTab.addEventListener("click", () => {
+    myCodesTab.classList.add("text-primary", "border-primary");
+    myCodesTab.classList.remove("text-gray-500", "border-transparent");
+    sharedWithMeTab.classList.add("text-gray-500", "border-transparent");
+    sharedWithMeTab.classList.remove("text-primary", "border-primary");
+    myCodesContent.classList.remove("hidden");
+    sharedWithMeContent.classList.add("hidden");
+    selectAll.checked = false;
+    document.querySelectorAll(".row-check").forEach(c => c.checked = false);
+    updateExportState();
+  });
+
+  sharedWithMeTab.addEventListener("click", () => {
+    sharedWithMeTab.classList.add("text-primary", "border-primary");
+    sharedWithMeTab.classList.remove("text-gray-500", "border-transparent");
+    myCodesTab.classList.add("text-gray-500", "border-transparent");
+    myCodesTab.classList.remove("text-primary", "border-primary");
+    sharedWithMeContent.classList.remove("hidden");
+    myCodesContent.classList.add("hidden");
     selectAll.checked = false;
     document.querySelectorAll(".row-check").forEach(c => c.checked = false);
     updateExportState();
@@ -155,12 +256,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  const importBtn     = document.getElementById("import-btn");
-  const importModal   = document.getElementById("import-modal");
-  const importCancel  = document.getElementById("import-cancel");
-  const fileInput     = document.getElementById("import-file");
-  const textInput     = document.getElementById("import-text");
-  const MAX_SIZE      = 5 * 1024 * 1024;
+  const importBtn = document.getElementById("import-btn");
+  const importModal = document.getElementById("import-modal");
+  const importCancel = document.getElementById("import-cancel");
+  const fileInput = document.getElementById("import-file");
+  const textInput = document.getElementById("import-text");
+  const shareModal = document.getElementById("share-modal");
+  const shareCancel = document.getElementById("share-cancel");
+  const shareForm = document.getElementById("share-form");
+  const shareEmailInput = document.getElementById("share-email");
+  const shareTotpIdsInput = document.getElementById("share-totp-ids");
+  const sharedUsersModal = document.getElementById("shared-users-modal");
+  const sharedUsersCancel = document.getElementById("shared-users-cancel");
+  const MAX_SIZE = 5 * 1024 * 1024;
 
   function showImportModal() {
     importModal.classList.remove("hidden");
@@ -168,14 +276,26 @@ document.addEventListener("DOMContentLoaded", () => {
     fileInput.value = null;
     textInput.focus();
   }
+
   function hideImportModal() {
     importModal.classList.add("hidden");
   }
 
+  function showShareModal(totpIds) {
+    shareModal.classList.remove("hidden");
+    shareEmailInput.value = "";
+    shareTotpIdsInput.value = totpIds;
+    shareEmailInput.focus();
+  }
+
+  function hideShareModal() {
+    shareModal.classList.add("hidden");
+  }
+
   function parseMigrationQRCode(img) {
     const canvas = document.createElement("canvas");
-    const ctx    = canvas.getContext("2d");
-    canvas.width  = img.naturalWidth || img.width;
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.naturalWidth || img.width;
     canvas.height = img.naturalHeight || img.height;
     ctx.drawImage(img, 0, 0);
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -232,6 +352,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  shareBtn.addEventListener("click", () => {
+    const ids = shareIdsInput.value.split(",").filter(id => id);
+    if (ids.length === 0) {
+      alert("Please select at least one TOTP item to share.");
+      return;
+    }
+    showShareModal(ids.join(","));
+  });
+
   importBtn.addEventListener("click", showImportModal);
   importCancel.addEventListener("click", hideImportModal);
+  shareCancel.addEventListener("click", hideShareModal);
+  sharedUsersCancel.addEventListener("click", () => sharedUsersModal.classList.add("hidden"));
 });
+
+window.showSharedUsers = showSharedUsers;
