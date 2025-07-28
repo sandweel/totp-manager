@@ -2,117 +2,145 @@
 {% block title %}Your TOTP Codes{% endblock %}
 
 {% block content %}
-<script src="{{ url_for('static', path='js/totp-list.js') }}"></script>
-<link rel="stylesheet" href="{{ url_for('static', path='css/ring.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', path='css/checkbox.css') }}">
+  <script defer src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script defer src="{{ url_for('static', path='js/totp-list.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/ring.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/checkbox.css') }}">
 
-<div class="flex justify-between items-center max-w-5xl mx-auto mb-4">
-  <h1 class="text-2xl font-bold text-primary">🔑 Your Codes</h1>
-  <button id="import-btn" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-md">Import</button>
-</div>
-<div class="bg-white shadow-xl rounded-xl p-6 max-w-5xl mx-auto">
-  <div class="overflow-x-auto">
-    <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
-      <thead>
-        <tr class="text-sm text-gray-600">
-          <th class="px-4 py-2 text-center">
-            <div class="checkbox-wrapper-45">
-              <input id="select-all" type="checkbox" />
-              <label class="cbx-45" for="select-all">
-                <div class="cbx-45-flip">
-                  <div class="cbx-45-front"></div>
-                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
-                </div>
-              </label>
-            </div>
-          </th>
-          <th class="text-left px-4 py-2">Account / Issuer</th>
-          <th class="text-center px-4 py-2">Current Code</th>
-          <th class="text-center px-4 py-2">Time Left</th>
-          <th class="text-center px-4 py-2">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in totps %}
-        <tr class="bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
-          <td class="text-center align-middle">
-            <div class="checkbox-wrapper-45">
-              <input id="cbx-{{ t.id }}" type="checkbox" class="row-check" value="{{ t.id }}" />
-              <label class="cbx-45" for="cbx-{{ t.id }}">
-                <div class="cbx-45-flip">
-                  <div class="cbx-45-front"></div>
-                  <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
-                </div>
-              </label>
-            </div>
-          </td>
-          <td class="px-4 py-3 rounded-l-lg text-gray-800">
-            <div>
-              <div class="font-medium">{{ t.account }}</div>
-              <div class="text-sm text-gray-500">{{ t.issuer }}</div>
-            </div>
-          </td>
-          <td class="px-4 py-3 text-center align-middle code-cell">
-            <div class="relative group inline-block">
-              <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-info-300 transition">
-                {{ t.code }}
-              </code>
-            </div>
-          </td>
-          <td class="px-4 py-3 text-center align-middle">
-            <div class="flex justify-center items-center h-full">
-              <svg width="32" height="32" viewBox="0 0 36 36" class="countdown-ring text-info">
-                <circle class="countdown-ring__bg" stroke="#e5e7eb" stroke-width="3" fill="transparent" r="13" cx="18" cy="18"/>
-                <circle class="countdown-ring__progress" stroke="#3B82F6" stroke-width="3" fill="transparent" r="13" cx="18" cy="18" stroke-linecap="round" stroke-dasharray="81.6814" stroke-dashoffset="0"/>
-              </svg>
-            </div>
-          </td>
-          <td class="px-4 py-3 text-center rounded-r-lg">
-            <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
-              <input type="hidden" name="ids" value="{{ t.id }}">
-              <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
-                Delete
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="flex justify-between items-center max-w-5xl mx-auto mb-4">
+    <h1 class="text-2xl font-bold text-primary">🔑 Your Codes</h1>
+    <button id="import-btn" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-md">Import</button>
   </div>
-</div>
 
-<div id="export-bar"
-     class="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-6 pointer-events-none transform translate-y-full opacity-0 transition-all duration-300">
-  <div class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
-    <form id="export-selected-form" method="post" action="/totp/export" class="flex items-center gap-4">
-      <input type="hidden" name="ids" id="export-ids">
-      <button type="button" id="export-btn"
-              class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed"
-              disabled>
-        Export selected
-      </button>
-    </form>
-
-    <form id="delete-selected-form" method="post" action="/totp/delete" class="flex items-center gap-4">
-      <input type="hidden" name="ids" id="delete-ids">
-      <button type="submit" id="delete-selected-btn" class="bg-danger-500 hover:bg-danger-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" onclick="return confirm('Are you sure you want to delete selected item(s)?');" disabled>Delete selected</button>
-    </form>
-
-    <button type="button" id="export-cancel" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+  <div class="bg-white shadow-xl rounded-xl p-6 max-w-5xl mx-auto">
+    <div class="overflow-x-auto">
+      <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
+        <thead>
+          <tr class="text-sm text-gray-600">
+            <th class="px-4 py-2 text-center">
+              <div class="checkbox-wrapper-45">
+                <input id="select-all" type="checkbox" />
+                <label class="cbx-45" for="select-all">
+                  <div class="cbx-45-flip">
+                    <div class="cbx-45-front"></div>
+                    <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
+                  </div>
+                </label>
+              </div>
+            </th>
+            <th class="text-left px-4 py-2">Account / Issuer</th>
+            <th class="text-center px-4 py-2">Current Code</th>
+            <th class="text-center px-4 py-2">Time Left</th>
+            <th class="text-center px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in totps %}
+          <tr class="bg-gray-100 rounded-lg shadow-sm transition" data-id="{{ t.id }}">
+            <td class="text-center align-middle">
+              <div class="checkbox-wrapper-45">
+                <input id="cbx-{{ t.id }}" type="checkbox" class="row-check" value="{{ t.id }}" />
+                <label class="cbx-45" for="cbx-{{ t.id }}">
+                  <div class="cbx-45-flip">
+                    <div class="cbx-45-front"></div>
+                    <div class="cbx-45-back"><svg viewBox="0 0 16 14"><path d="M2 8.5L6 12.5L14 1.5"/></svg></div>
+                  </div>
+                </label>
+              </div>
+            </td>
+            <td class="px-4 py-3 rounded-l-lg text-gray-800">
+              <div>
+                <div class="font-medium">{{ t.account }}</div>
+                <div class="text-sm text-gray-500">{{ t.issuer }}</div>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center align-middle code-cell">
+              <div class="relative group inline-block">
+                <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-info-300 transition">
+                  {{ t.code }}
+                </code>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center align-middle">
+              <div class="flex justify-center items-center h-full">
+                <svg width="32" height="32" viewBox="0 0 36 36" class="countdown-ring text-info">
+                  <circle class="countdown-ring__bg" stroke="#e5e7eb" stroke-width="3" fill="transparent" r="13" cx="18" cy="18"/>
+                  <circle class="countdown-ring__progress" stroke="#3B82F6" stroke-width="3" fill="transparent" r="13" cx="18" cy="18" stroke-linecap="round" stroke-dasharray="81.6814" stroke-dashoffset="0"/>
+                </svg>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-center rounded-r-lg">
+              <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
+                <input type="hidden" name="ids" value="{{ t.id }}">
+                <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-</div>
 
-<div id="import-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-  <div class="bg-white rounded-lg p-6 w-96">
-    <h2 class="text-xl font-semibold mb-4">Import TOTP URI(s)</h2>
-    <form id="import-form" method="post" action="/totp/import">
-      <textarea id="import-text" name="uri" class="w-full border rounded p-2 mb-4" placeholder="Paste otpauth://… or migration URI here"></textarea>
-      <div class="flex justify-end gap-2">
-        <button type="button" id="import-cancel" class="px-4 py-2">Cancel</button>
-        <button type="submit" class="bg-primary text-white px-4 py-2 rounded">Import</button>
-      </div>
-    </form>
+  <div id="export-bar"
+       class="fixed inset-x-0 bottom-0 z-40 flex justify-center pb-6 pointer-events-none transform translate-y-full opacity-0 transition-all duration-300">
+    <div class="pointer-events-auto bg-white shadow-2xl border border-gray-200 rounded-xl px-6 py-4 flex items-center gap-4">
+
+      <form id="export-selected-form"
+            method="post"
+            action="/totp/export"
+            class="flex items-center gap-4">
+        <input type="hidden" name="ids" id="export-ids">
+        <button type="button" id="export-btn"
+                class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed"
+                disabled>
+          Export selected
+        </button>
+      </form>
+
+      <form id="delete-selected-form"
+            method="post"
+            action="/totp/delete"
+            class="flex items-center gap-4">
+        <input type="hidden" name="ids" id="delete-ids">
+        <button type="submit" id="delete-selected-btn"
+                onclick="return confirm('Are you sure you want to delete selected item(s)?');"
+                class="bg-danger-500 hover:bg-danger-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed"
+                disabled>
+          Delete selected
+        </button>
+      </form>
+
+      <button type="button" id="export-cancel" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>
+    </div>
   </div>
-</div>
+
+  <div id="import-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 w-96">
+      <h2 class="text-xl font-semibold mb-4">Import TOTP URI(s)</h2>
+      <form id="import-form" method="post" action="/totp/import">
+        <div class="mb-4">
+          <input type="file" id="import-file" accept="image/*"
+                 class="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4 file:rounded-md
+                        file:border-0 file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition"/>
+          <p class="text-xs mt-1 text-gray-500">
+            Choose an image of your migration QR code to auto‑fill the URI.
+          </p>
+        </div>
+        <div class="mb-4">
+          <textarea id="import-text" name="uri" rows="3"
+                    placeholder="Or paste migration QR image (Ctrl+V)"
+                    class="w-full border rounded p-2 text-sm"></textarea>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="import-cancel" class="px-4 py-2">Cancel</button>
+          <button type="submit" class="bg-primary text-white px-4 py-2 rounded">Import</button>
+        </div>
+      </form>
+    </div>
+  </div>
 {% endblock %}

@@ -11,6 +11,7 @@ function copyCode(el) {
     setTimeout(() => el.parentElement.removeChild(msg), 200);
   }, 1600);
 }
+
 async function fetchTotpData() {
   try {
     const resp = await fetch("/totp/list-all");
@@ -25,6 +26,7 @@ async function fetchTotpData() {
     }));
   }
 }
+
 function updateCodes(data) {
   document.querySelectorAll("#totp-table tbody tr").forEach(row => {
     const id = row.getAttribute("data-id");
@@ -38,10 +40,12 @@ function updateCodes(data) {
     }
   });
 }
+
 const RADIUS = 13;
 const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
 const PERIOD = 30000;
 let lastUpdatedCycle = 0;
+
 function animateProgress() {
   const now = Date.now();
   const msIntoPeriod = now % PERIOD;
@@ -56,6 +60,7 @@ function animateProgress() {
   }
   requestAnimationFrame(animateProgress);
 }
+
 function showQrModalFromBlob(blob) {
   const url = URL.createObjectURL(blob);
   const overlay = document.createElement("div");
@@ -67,6 +72,7 @@ function showQrModalFromBlob(blob) {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    pointer-events: auto;
   `;
   overlay.addEventListener("click", () => {
     URL.revokeObjectURL(url);
@@ -123,7 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".row-check").forEach(c => c.checked = e.target.checked);
     updateExportState();
   });
-
   document.querySelectorAll(".row-check").forEach(c => c.addEventListener("change", updateExportState));
 
   exportCancel.addEventListener("click", () => {
@@ -138,7 +143,8 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch(form.action, {
         method: form.method,
-        body: formData
+        body: formData,
+        credentials: 'same-origin'
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const blob = await res.blob();
@@ -149,17 +155,83 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  const importBtn    = document.getElementById("import-btn");
-  const importModal  = document.getElementById("import-modal");
-  const importText   = document.getElementById("import-text");
-  const importCancel = document.getElementById("import-cancel");
+  const importBtn     = document.getElementById("import-btn");
+  const importModal   = document.getElementById("import-modal");
+  const importCancel  = document.getElementById("import-cancel");
+  const fileInput     = document.getElementById("import-file");
+  const textInput     = document.getElementById("import-text");
+  const MAX_SIZE      = 5 * 1024 * 1024;
 
-  importBtn.addEventListener("click", () => {
+  function showImportModal() {
     importModal.classList.remove("hidden");
-    importText.focus();
-  });
-  importCancel.addEventListener("click", () => {
+    textInput.value = "";
+    fileInput.value = null;
+    textInput.focus();
+  }
+  function hideImportModal() {
     importModal.classList.add("hidden");
-    importText.value = "";
+  }
+
+  function parseMigrationQRCode(img) {
+    const canvas = document.createElement("canvas");
+    const ctx    = canvas.getContext("2d");
+    canvas.width  = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(data.data, canvas.width, canvas.height);
+    if (!code) {
+      alert("No QR code found in the image.");
+      return;
+    }
+    if (!code.data.startsWith("otpauth-migration://")) {
+      alert("QR code is not a migration URI.");
+      return;
+    }
+    textInput.value = code.data;
+  }
+
+  fileInput.addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file.");
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      alert("Image too large (max 5MB).");
+      return;
+    }
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      parseMigrationQRCode(img);
+      URL.revokeObjectURL(img.src);
+    };
   });
+
+  window.addEventListener("paste", e => {
+    if (importModal.classList.contains("hidden")) return;
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const blob = items[i].getAsFile();
+        if (blob.size > MAX_SIZE) {
+          alert("Pasted image too large (max 5MB).");
+          return;
+        }
+        const img = new Image();
+        img.src = URL.createObjectURL(blob);
+        img.onload = () => {
+          parseMigrationQRCode(img);
+          URL.revokeObjectURL(img.src);
+        };
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+
+  importBtn.addEventListener("click", showImportModal);
+  importCancel.addEventListener("click", hideImportModal);
 });
