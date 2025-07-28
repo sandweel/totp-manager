@@ -127,23 +127,38 @@ async function unshareTotp(totpId, email) {
   const formData = new FormData();
   formData.append("totp_id", totpId);
   formData.append("email", email);
+
   try {
     const resp = await fetch("/totp/unshare", {
       method: "POST",
       body: formData,
       credentials: "same-origin"
     });
+
+    if (!resp.ok) throw new Error("Unshare failed");
+
+    await showSharedUsers(totpId);
+
+    await removeSharedButtonIfNoneLeft(totpId);
+  } catch (err) {
+    console.error("Failed to unshare:", err);
+  }
+}
+async function removeSharedButtonIfNoneLeft(totpId) {
+  try {
+    const resp = await fetch(`/totp/shared-users/${totpId}`);
+    if (!resp.ok) throw new Error("Fetch failed");
+
     const data = await resp.json();
-    if (resp.ok) {
-      showSharedUsers(totpId);
+    if (Array.isArray(data.emails) && data.emails.length === 0) {
       const row = document.querySelector(`#totp-table tr[data-id="${totpId}"]`);
-      if (row && !data.emails?.length) {
+      if (row) {
         const sharedBtn = row.querySelector(".shared-btn");
         if (sharedBtn) sharedBtn.remove();
       }
     }
   } catch (err) {
-    console.error(err);
+    console.error("Failed to check shared status:", err);
   }
 }
 

@@ -51,19 +51,22 @@ class TotpService:
         async with async_session() as session:
             user_fernet = Fernet(master_fernet.decrypt(user.encrypted_dek.encode()))
             result = await session.execute(
-                select(TOTPItem, SharedTOTP)
+                select(TOTPItem, SharedTOTP, User.email)
                 .join(SharedTOTP, TOTPItem.id == SharedTOTP.totp_item_id)
+                .join(User, TOTPItem.user_id == User.id)
                 .where(SharedTOTP.shared_with_user_id == user.id)
             )
             rows = result.all()
             output = []
-            for totp, shared_totp in rows:
+
+            for totp, shared_totp, owner_email in rows:
                 try:
                     secret = user_fernet.decrypt(shared_totp.encrypted_secret.encode()).decode()
                     code = pyotp.TOTP(secret).now()
                     output.append({
                         "id": totp.id,
                         "account": totp.account,
+                        "owner_email": owner_email,
                         "issuer": totp.issuer,
                         "code": code
                     })
@@ -72,6 +75,7 @@ class TotpService:
                     output.append({
                         "id": totp.id,
                         "account": totp.account,
+                        "owner_email": owner_email,
                         "issuer": totp.issuer,
                         "code": "Error"
                     })

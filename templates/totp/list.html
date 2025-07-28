@@ -101,6 +101,7 @@
           <thead>
             <tr class="text-sm text-gray-600">
               <th class="text-left px-4 py-2">Account / Issuer</th>
+              <th class="text-center px-4 py-2">Owner</th>
               <th class="text-center px-4 py-2">Current Code</th>
               <th class="text-center px-4 py-2">Time Left</th>
             </tr>
@@ -113,6 +114,9 @@
                   <div class="font-medium">{{ t.account }}</div>
                   <div class="text-sm text-gray-500">{{ t.issuer }}</div>
                 </div>
+              </td>
+              <td class="px-4 py-3 text-center align-middle">
+                  <div class="text-sm font-semibold text-gray-700">{{ t.owner_email }}</div>
               </td>
               <td class="px-4 py-3 text-center align-middle code-cell">
                 <div class="relative group inline-block">

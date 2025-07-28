@@ -74,7 +74,7 @@ async def delete_items(request: Request, ids: str = Form(...), user=Depends(get_
 
 
 @router.get("/list-all")
-async def api_totp_list(user=Depends(get_authenticated_user)):
+async def totp_list(user=Depends(get_authenticated_user)):
     totps = await TotpService.list_all(user)
     return JSONResponse(content=[
         {"id": t["id"], "account": t["account"], "issuer": t["issuer"], "code": t["code"]}
@@ -83,10 +83,10 @@ async def api_totp_list(user=Depends(get_authenticated_user)):
 
 
 @router.get("/list-shared-with-me")
-async def api_shared_totp_list(user=Depends(get_authenticated_user)):
+async def shared_totp_list(user=Depends(get_authenticated_user)):
     totps = await TotpService.list_shared_with_me(user)
     return JSONResponse(content=[
-        {"id": t["id"], "account": t["account"], "issuer": t["issuer"], "code": t["code"]}
+        {"id": t["id"], "account": t["account"], "owner_email": t["owner_email"], "issuer": t["issuer"], "code": t["code"]}
         for t in totps
     ])
 

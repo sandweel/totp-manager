@@ -20,7 +20,7 @@ function initPasswordStrengthMeter() {
     };
     Object.keys(checks).forEach((key) => {
       if (checks[key]) {
-        rules[key].classList.add("text-success");
+        rules[key].classList.add("text-success-500");
         rules[key].classList.remove("text-gray-600");
         score++;
       } else {
@@ -31,11 +31,11 @@ function initPasswordStrengthMeter() {
     const percentage = (score / 5) * 100;
     bar.style.width = percentage + "%";
     if (score === 5) {
-      bar.className = "h-full bg-success transition-all duration-300";
+      bar.className = "h-full bg-success-500 transition-all duration-300";
     } else if (score >= 3) {
-      bar.className = "h-full bg-warning transition-all duration-300";
+      bar.className = "h-full bg-warning-500 transition-all duration-300";
     } else {
-      bar.className = "h-full bg-danger transition-all duration-300";
+      bar.className = "h-full bg-danger-500 transition-all duration-300";
     }
   });
 }
