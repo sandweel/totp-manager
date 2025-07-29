@@ -96,13 +96,13 @@ async def post_register(request: Request, email: str = Form(...), password: str 
 
     confirm_token = create_access_token({"sub": str(user.id)}, expires_delta=timedelta(hours=24))
     link = f"{settings.FRONTEND_URL}/auth/confirm?token={confirm_token}"
-
     try:
+        html_content = templates.get_template("email/confirmation_email.html").render(link=link, year=datetime.now().year)
         await http_client.post(
             f"https://api.mailgun.net/v3/{settings.MAILGUN_DOMAIN}/messages",
             auth=("api", settings.MAILGUN_API_KEY),
             data={"from": f"no-reply@{settings.MAILGUN_DOMAIN}", "to": [email], "subject": "Confirm your account",
-                  "text": f"Click to confirm: {link}"}
+                  "html": html_content}
         )
         flash(request, "Confirmation email sent. Please check your email", "success")
     except Exception as e:
@@ -209,11 +209,12 @@ async def send_reset_email(request: Request, email: str = Form(...),
             link = f"{settings.FRONTEND_URL}/auth/reset-password/confirm?token={token}"
 
             try:
+                html_content = templates.get_template("email/reset_password_email.html").render(link=link, year=datetime.now().year)
                 await http_client.post(
                     f"https://api.mailgun.net/v3/{settings.MAILGUN_DOMAIN}/messages",
                     auth=("api", settings.MAILGUN_API_KEY),
                     data={"from": f"no-reply@{settings.MAILGUN_DOMAIN}", "to": [email], "subject": "Reset your password",
-                          "text": f"Click to reset your password: {link}"}
+                          "html": html_content}
                 )
                 flash(request, "If email exists, reset link sent. Check your inbox.", "success")
             except Exception as e:
@@ -280,6 +281,7 @@ async def reset_password(request: Request, token: str = Form(...), password: str
         user.hashed_password = pwd_context.hash(password)
         user.password_reset_token_id = None
         user.password_reset_requested_at = None
+        user.is_verified = True
         session.add(user)
         await session.commit()
 

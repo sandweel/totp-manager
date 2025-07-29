@@ -24,7 +24,7 @@ function initPasswordStrengthMeter() {
         rules[key].classList.remove("text-gray-600");
         score++;
       } else {
-        rules[key].classList.remove("text-success");
+        rules[key].classList.remove("text-success-500");
         rules[key].classList.add("text-gray-600");
       }
     });
