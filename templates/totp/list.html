@@ -76,17 +76,17 @@
               </td>
               <td class="px-4 py-3 text-center rounded-r-lg">
                 <div class="flex gap-2 justify-center">
+                  {% if t.is_shared %}
+                  <button onclick="showSharedUsers({{ t.id }})" class="bg-info-500 hover:bg-info-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn">
+                    Shared
+                  </button>
+                  {% endif %}
                   <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
                     <input type="hidden" name="ids" value="{{ t.id }}">
                     <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
                       Delete
                     </button>
                   </form>
-                  {% if t.is_shared %}
-                  <button onclick="showSharedUsers({{ t.id }})" class="bg-info-500 hover:bg-info-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn">
-                    Shared
-                  </button>
-                  {% endif %}
                 </div>
               </td>
             </tr>
@@ -149,16 +149,16 @@
           Export selected
         </button>
       </form>
+            <form id="share-selected-form" method="post" action="/totp/share" class="flex items-center gap-4">
+        <input type="hidden" name="totp_ids" id="share-ids">
+        <button type="button" id="share-btn" class="bg-info-500 hover:bg-info-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
+          Share selected
+        </button>
+      </form>
       <form id="delete-selected-form" method="post" action="/totp/delete" class="flex items-center gap-4">
         <input type="hidden" name="ids" id="delete-ids">
         <button type="submit" id="delete-selected-btn" onclick="return confirm('Are you sure you want to delete selected item(s)?');" class="bg-danger-500 hover:bg-danger-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
           Delete selected
-        </button>
-      </form>
-      <form id="share-selected-form" method="post" action="/totp/share" class="flex items-center gap-4">
-        <input type="hidden" name="totp_ids" id="share-ids">
-        <button type="button" id="share-btn" class="bg-info-500 hover:bg-info-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
-          Share selected
         </button>
       </form>
       <button type="button" id="export-cancel" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</button>

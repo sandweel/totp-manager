@@ -1,3 +1,27 @@
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+const MAX_SIZE = 5 * 1024 * 1024;
+const PERIOD = 30000;
+const RADIUS = 13;
+const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
+
+function show(el) {
+  el.classList.remove("hidden");
+}
+
+function hide(el) {
+  el.classList.add("hidden");
+}
+
+function fetchJSON(url, options = {}) {
+  return fetch(url, options)
+    .then(r => r.json().then(data => {
+      if (!r.ok) throw new Error(data.message || `Error: ${r.status}`);
+      return data;
+    }));
+}
+
+// === COPY CODE ===
 function copyCode(el) {
   navigator.clipboard.writeText(el.innerText);
   const msg = document.createElement("span");
@@ -12,374 +36,261 @@ function copyCode(el) {
   }, 1600);
 }
 
-async function fetchTotpData(endpoint = "/totp/list-all") {
+// === FETCH AND UPDATE CODES ===
+async function fetchTotpData(endpoint) {
   try {
-    const resp = await fetch(endpoint);
-    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
-    return await resp.json();
+    return await fetchJSON(endpoint);
   } catch (err) {
-    console.error("Failed to fetch TOTP data:", err);
-    const tableId = endpoint === "/totp/list-all" ? "#totp-table" : "#shared-totp-table";
-    const rows = document.querySelectorAll(`${tableId} tbody tr`);
-    return Array.from(rows).map(row => ({
-      id: row.getAttribute("data-id"),
-      code: "Failed to fetch codes"
+    console.error("Failed to fetch TOTP:", err);
+    const table = endpoint.includes("shared") ? "#shared-totp-table" : "#totp-table";
+    return [...$$(`${table} tbody tr`)].map(row => ({
+      id: row.dataset.id,
+      code: "Error"
     }));
   }
 }
 
-function updateCodes(data, tableId = "#totp-table") {
-  document.querySelectorAll(`${tableId} tbody tr`).forEach(row => {
-    const id = row.getAttribute("data-id");
-    const item = data.find(el => String(el.id) === id);
-    if (item) {
-      const codeCell = row.querySelector(".code-cell code");
-      if (codeCell && codeCell.textContent !== item.code) {
-        codeCell.textContent = item.code;
-      }
+function updateCodes(data, tableSelector) {
+  $$(tableSelector + " tbody tr").forEach(row => {
+    const id = row.dataset.id;
+    const item = data.find(i => String(i.id) === id);
+    const codeCell = row.querySelector(".code-cell code");
+    if (item && codeCell && codeCell.textContent !== item.code) {
+      codeCell.textContent = item.code;
       codeCell.classList.toggle("text-danger", item.code === "Error");
     }
   });
 }
 
-const RADIUS = 13;
-const FULL_DASH_ARRAY = 2 * Math.PI * RADIUS;
-const PERIOD = 30000;
-let lastUpdatedCycle = 0;
+// === ANIMATION ===
+let lastCycle = 0;
 
 function animateProgress() {
   const now = Date.now();
-  const msIntoPeriod = now % PERIOD;
-  const dashoffset = FULL_DASH_ARRAY * (msIntoPeriod / PERIOD);
-  document.querySelectorAll(".countdown-ring__progress").forEach(circle => {
-    circle.style.strokeDashoffset = dashoffset;
+  const offset = FULL_DASH_ARRAY * ((now % PERIOD) / PERIOD);
+  $$(".countdown-ring__progress").forEach(c => {
+    c.style.strokeDashoffset = offset;
   });
+
   const currentCycle = Math.floor(now / PERIOD);
-  if (currentCycle !== lastUpdatedCycle) {
-    lastUpdatedCycle = currentCycle;
-    fetchTotpData("/totp/list-all").then(data => data && updateCodes(data, "#totp-table"));
-    fetchTotpData("/totp/list-shared-with-me").then(data => data && updateCodes(data, "#shared-totp-table"));
+  if (currentCycle !== lastCycle) {
+    lastCycle = currentCycle;
+    fetchTotpData("/totp/list-all").then(data => updateCodes(data, "#totp-table"));
+    fetchTotpData("/totp/list-shared-with-me").then(data => updateCodes(data, "#shared-totp-table"));
   }
   requestAnimationFrame(animateProgress);
 }
 
+// === QR DISPLAY ===
 function showQrModalFromBlob(blob) {
   const url = URL.createObjectURL(blob);
   const overlay = document.createElement("div");
-  overlay.style.cssText = `
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    pointer-events: auto;
-  `;
-  overlay.addEventListener("click", () => {
+  overlay.className = "fixed inset-0 bg-black/75 z-50 flex items-center justify-center";
+  overlay.onclick = () => {
     URL.revokeObjectURL(url);
-    document.body.removeChild(overlay);
-  });
+    overlay.remove();
+  };
+
   const img = document.createElement("img");
   img.src = url;
-  img.style.cssText = `
-    max-width: 90%;
-    max-height: 90%;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-  `;
-  img.addEventListener("click", e => e.stopPropagation());
+  img.className = "max-w-[90%] max-h-[90%] shadow-xl";
+  img.onclick = e => e.stopPropagation();
+
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 }
 
-async function showSharedUsers(totpId) {
-  const modal = document.getElementById("shared-users-modal");
-  const list = document.getElementById("shared-users-list");
-  list.innerHTML = "<p>Loading...</p>";
-  modal.classList.remove("hidden");
+// === PARSE QR ===
+function parseMigrationQRCode(img, targetInput) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  ctx.drawImage(img, 0, 0);
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const code = jsQR(data.data, canvas.width, canvas.height);
 
+  if (!code || !code.data.startsWith("otpauth-migration://")) {
+    alert("Invalid QR code.");
+    return;
+  }
+
+  targetInput.value = code.data;
+}
+
+// === SHARING ===
+async function showSharedUsers(totpId) {
+  const modal = $("#shared-users-modal");
+  const list = $("#shared-users-list");
+  show(modal);
+  list.innerHTML = "<p>Loading...</p>";
   try {
-    const resp = await fetch(`/totp/shared-users/${totpId}`);
-    const data = await resp.json();
-    if (!resp.ok) {
-      list.innerHTML = `<p>${data.message || "Error loading shared users."}</p>`;
-      return;
-    }
+    const data = await fetchJSON(`/totp/shared-users/${totpId}`);
     list.innerHTML = data.emails.length
       ? data.emails.map(email => `
           <div class="flex justify-between items-center mb-2">
             <span>${email}</span>
             <button onclick="unshareTotp(${totpId}, '${email}')" class="text-danger-500 hover:text-danger-700">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+              ✕
             </button>
-          </div>
-        `).join("")
+          </div>`).join("")
       : "<p>No users shared with.</p>";
-  } catch (err) {
-    console.error(err);
-    list.innerHTML = "<p>Error loading shared users.</p>";
+  } catch {
+    list.innerHTML = "<p>Failed to load users.</p>";
   }
 }
 
 async function unshareTotp(totpId, email) {
-  const formData = new FormData();
-  formData.append("totp_id", totpId);
-  formData.append("email", email);
+  const fd = new FormData();
+  fd.append("totp_id", totpId);
+  fd.append("email", email);
 
   try {
-    const resp = await fetch("/totp/unshare", {
+    const res = await fetch("/totp/unshare", {
       method: "POST",
-      body: formData,
-      credentials: "same-origin"
+      body: fd
     });
-
-    if (!resp.ok) throw new Error("Unshare failed");
-
+    if (!res.ok) throw new Error("Unshare failed");
     await showSharedUsers(totpId);
-
-    await removeSharedButtonIfNoneLeft(totpId);
-  } catch (err) {
-    console.error("Failed to unshare:", err);
-  }
-}
-async function removeSharedButtonIfNoneLeft(totpId) {
-  try {
-    const resp = await fetch(`/totp/shared-users/${totpId}`);
-    if (!resp.ok) throw new Error("Fetch failed");
-
-    const data = await resp.json();
-    if (Array.isArray(data.emails) && data.emails.length === 0) {
-      const row = document.querySelector(`#totp-table tr[data-id="${totpId}"]`);
-      if (row) {
-        const sharedBtn = row.querySelector(".shared-btn");
-        if (sharedBtn) sharedBtn.remove();
-      }
+    const data = await fetchJSON(`/totp/shared-users/${totpId}`);
+    if (data.emails.length === 0) {
+      const row = $(`#totp-table tr[data-id="${totpId}"]`);
+      row?.querySelector(".shared-btn")?.remove();
     }
   } catch (err) {
-    console.error("Failed to check shared status:", err);
-  }
-}
-
-function addSharedButton(totpId) {
-  const row = document.querySelector(`#totp-table tr[data-id="${totpId}"]`);
-  if (row && !row.querySelector(".shared-btn")) {
-    const actions = row.querySelector("td:last-child div");
-    const sharedBtn = document.createElement("button");
-    sharedBtn.className = "bg-info-500 hover:bg-info-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn";
-    sharedBtn.textContent = "Shared";
-    sharedBtn.onclick = () => showSharedUsers(totpId);
-    actions.appendChild(sharedBtn);
+    console.error(err);
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   animateProgress();
 
-  const selectAll = document.getElementById("select-all");
-  const exportBar = document.getElementById("export-bar");
-  const exportBtn = document.getElementById("export-btn");
-  const deleteBtn = document.getElementById("delete-selected-btn");
-  const shareBtn = document.getElementById("share-btn");
-  const exportIdsInput = document.getElementById("export-ids");
-  const deleteIdsInput = document.getElementById("delete-ids");
-  const shareIdsInput = document.getElementById("share-ids");
-  const exportCancel = document.getElementById("export-cancel");
+  const selectAll = $("#select-all");
+  const exportBar = $("#export-bar");
+  const exportBtn = $("#export-btn");
+  const deleteBtn = $("#delete-selected-btn");
+  const shareBtn = $("#share-btn");
+  const exportIdsInput = $("#export-ids");
+  const deleteIdsInput = $("#delete-ids");
+  const shareIdsInput = $("#share-ids");
+  const exportCancel = $("#export-cancel");
 
-  const myCodesTab = document.getElementById("my-codes-tab");
-  const sharedWithMeTab = document.getElementById("shared-with-me-tab");
-  const myCodesContent = document.getElementById("my-codes");
-  const sharedWithMeContent = document.getElementById("shared-with-me");
-
-  function toggleExportBar(show) {
-    exportBar.classList.toggle("translate-y-full", !show);
-    exportBar.classList.toggle("opacity-0", !show);
-  }
+  const rowCheckboxes = () => $$(".row-check");
 
   function updateExportState() {
-    const ids = Array.from(document.querySelectorAll(".row-check"))
-      .filter(c => c.checked)
-      .map(c => c.value)
-      .join(",");
-
-    exportIdsInput.value = ids;
-    deleteIdsInput.value = ids;
-    shareIdsInput.value = ids;
-
-    const any = ids.length > 0;
+    const ids = [...rowCheckboxes()].filter(c => c.checked).map(c => c.value).join(",");
+    [exportIdsInput, deleteIdsInput, shareIdsInput].forEach(el => el.value = ids);
+    const active = ids.length > 0;
     [exportBtn, deleteBtn, shareBtn].forEach(btn => {
-      btn.disabled = !any;
-      btn.classList.toggle("opacity-50", !any);
-      btn.classList.toggle("cursor-not-allowed", !any);
+      btn.disabled = !active;
+      btn.classList.toggle("opacity-50", !active);
+      btn.classList.toggle("cursor-not-allowed", !active);
     });
-
-    toggleExportBar(any);
+    exportBar.classList.toggle("translate-y-full", !active);
+    exportBar.classList.toggle("opacity-0", !active);
   }
 
-  selectAll.addEventListener("change", e => {
-    document.querySelectorAll(".row-check").forEach(c => c.checked = e.target.checked);
+  selectAll.addEventListener("change", () => {
+    rowCheckboxes().forEach(c => c.checked = selectAll.checked);
     updateExportState();
   });
-  document.querySelectorAll(".row-check").forEach(c => c.addEventListener("change", updateExportState));
 
+  rowCheckboxes().forEach(c => c.addEventListener("change", updateExportState));
   exportCancel.addEventListener("click", () => {
     selectAll.checked = false;
-    document.querySelectorAll(".row-check").forEach(c => c.checked = false);
+    rowCheckboxes().forEach(c => c.checked = false);
     updateExportState();
   });
 
-  myCodesTab.addEventListener("click", () => {
-    myCodesTab.classList.add("text-primary", "border-primary");
-    myCodesTab.classList.remove("text-gray-500", "border-transparent");
-    sharedWithMeTab.classList.add("text-gray-500", "border-transparent");
-    sharedWithMeTab.classList.remove("text-primary", "border-primary");
-    myCodesContent.classList.remove("hidden");
-    sharedWithMeContent.classList.add("hidden");
-    selectAll.checked = false;
-    document.querySelectorAll(".row-check").forEach(c => c.checked = false);
-    updateExportState();
-  });
+  // Tabs
+  const tabs = {
+    "my-codes-tab": "my-codes",
+    "shared-with-me-tab": "shared-with-me"
+  };
 
-  sharedWithMeTab.addEventListener("click", () => {
-    sharedWithMeTab.classList.add("text-primary", "border-primary");
-    sharedWithMeTab.classList.remove("text-gray-500", "border-transparent");
-    myCodesTab.classList.add("text-gray-500", "border-transparent");
-    myCodesTab.classList.remove("text-primary", "border-primary");
-    sharedWithMeContent.classList.remove("hidden");
-    myCodesContent.classList.add("hidden");
-    selectAll.checked = false;
-    document.querySelectorAll(".row-check").forEach(c => c.checked = false);
-    updateExportState();
-  });
-
-  exportBtn.addEventListener("click", async () => {
-    const form = document.getElementById("export-selected-form");
-    const formData = new FormData(form);
-    try {
-      const res = await fetch(form.action, {
-        method: form.method,
-        body: formData,
-        credentials: 'same-origin'
+  for (const [tabId, contentId] of Object.entries(tabs)) {
+    $(`#${tabId}`).addEventListener("click", () => {
+      Object.entries(tabs).forEach(([tid, cid]) => {
+        $(`#${tid}`).classList.toggle("text-primary", tid === tabId);
+        $(`#${tid}`).classList.toggle("text-gray-500", tid !== tabId);
+        $(`#${tid}`).classList.toggle("border-primary", tid === tabId);
+        $(`#${tid}`).classList.toggle("border-transparent", tid !== tabId);
+        $(`#${cid}`).classList.toggle("hidden", cid !== contentId);
       });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      const blob = await res.blob();
-      showQrModalFromBlob(blob);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load QR code!");
-    }
+      selectAll.checked = false;
+      rowCheckboxes().forEach(c => c.checked = false);
+      updateExportState();
+    });
+  }
+
+  // Export QR
+  exportBtn.addEventListener("click", async () => {
+    const form = $("#export-selected-form");
+    const res = await fetch(form.action, {
+      method: form.method,
+      body: new FormData(form),
+      credentials: "same-origin"
+    });
+    if (!res.ok) return alert("Failed to load QR");
+    const blob = await res.blob();
+    showQrModalFromBlob(blob);
   });
 
-  const importBtn = document.getElementById("import-btn");
-  const importModal = document.getElementById("import-modal");
-  const importCancel = document.getElementById("import-cancel");
-  const fileInput = document.getElementById("import-file");
-  const textInput = document.getElementById("import-text");
-  const shareModal = document.getElementById("share-modal");
-  const shareCancel = document.getElementById("share-cancel");
-  const shareForm = document.getElementById("share-form");
-  const shareEmailInput = document.getElementById("share-email");
-  const shareTotpIdsInput = document.getElementById("share-totp-ids");
-  const sharedUsersModal = document.getElementById("shared-users-modal");
-  const sharedUsersCancel = document.getElementById("shared-users-cancel");
-  const MAX_SIZE = 5 * 1024 * 1024;
+  // Import QR
+  const importModal = $("#import-modal");
+  const fileInput = $("#import-file");
+  const textInput = $("#import-text");
 
-  function showImportModal() {
-    importModal.classList.remove("hidden");
+  $("#import-btn").addEventListener("click", () => {
+    show(importModal);
     textInput.value = "";
     fileInput.value = null;
     textInput.focus();
-  }
-
-  function hideImportModal() {
-    importModal.classList.add("hidden");
-  }
-
-  function showShareModal(totpIds) {
-    shareModal.classList.remove("hidden");
-    shareEmailInput.value = "";
-    shareTotpIdsInput.value = totpIds;
-    shareEmailInput.focus();
-  }
-
-  function hideShareModal() {
-    shareModal.classList.add("hidden");
-  }
-
-  function parseMigrationQRCode(img) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
-    ctx.drawImage(img, 0, 0);
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(data.data, canvas.width, canvas.height);
-    if (!code) {
-      alert("No QR code found in the image.");
-      return;
-    }
-    if (!code.data.startsWith("otpauth-migration://")) {
-      alert("QR code is not a migration URI.");
-      return;
-    }
-    textInput.value = code.data;
-  }
+  });
+  $("#import-cancel").addEventListener("click", () => hide(importModal));
 
   fileInput.addEventListener("change", e => {
     const file = e.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      alert("Please select an image file.");
-      return;
-    }
-    if (file.size > MAX_SIZE) {
-      alert("Image too large (max 5MB).");
-      return;
-    }
+    if (!file || !file.type.startsWith("image/") || file.size > MAX_SIZE)
+      return alert("Invalid image (max 5MB)");
     const img = new Image();
-    img.src = URL.createObjectURL(file);
     img.onload = () => {
-      parseMigrationQRCode(img);
+      parseMigrationQRCode(img, textInput);
       URL.revokeObjectURL(img.src);
     };
+    img.src = URL.createObjectURL(file);
   });
 
   window.addEventListener("paste", e => {
     if (importModal.classList.contains("hidden")) return;
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith("image/")) {
-        const blob = items[i].getAsFile();
-        if (blob.size > MAX_SIZE) {
-          alert("Pasted image too large (max 5MB).");
-          return;
-        }
+    [...e.clipboardData.items].forEach(item => {
+      if (item.type.startsWith("image/")) {
+        const blob = item.getAsFile();
+        if (blob.size > MAX_SIZE) return alert("Image too large");
         const img = new Image();
-        img.src = URL.createObjectURL(blob);
         img.onload = () => {
-          parseMigrationQRCode(img);
+          parseMigrationQRCode(img, textInput);
           URL.revokeObjectURL(img.src);
         };
+        img.src = URL.createObjectURL(blob);
         e.preventDefault();
-        break;
       }
-    }
+    });
   });
 
+  // Share
   shareBtn.addEventListener("click", () => {
-    const ids = shareIdsInput.value.split(",").filter(id => id);
-    if (ids.length === 0) {
-      alert("Please select at least one TOTP item to share.");
-      return;
-    }
-    showShareModal(ids.join(","));
+    const ids = shareIdsInput.value;
+    if (!ids) return alert("Select at least one TOTP to share");
+    const modal = $("#share-modal");
+    show(modal);
+    $("#share-email").value = "";
+    $("#share-totp-ids").value = ids;
+    $("#share-email").focus();
   });
 
-  importBtn.addEventListener("click", showImportModal);
-  importCancel.addEventListener("click", hideImportModal);
-  shareCancel.addEventListener("click", hideShareModal);
-  sharedUsersCancel.addEventListener("click", () => sharedUsersModal.classList.add("hidden"));
+  $("#share-cancel").addEventListener("click", () => hide($("#share-modal")));
+  $("#shared-users-cancel").addEventListener("click", () => hide($("#shared-users-modal")));
 });
 
 window.showSharedUsers = showSharedUsers;
