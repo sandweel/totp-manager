@@ -18,7 +18,7 @@ module.exports = {
         'primary-light': '#334155',
         'primary-text': '#f1f5f9',
         'primary-text-hover': '#94A3B8',
-        'primary-hover': '#94A3B8',
+        'primary-hover': '#1E3A51',
         danger: colors.red,
         success: colors.green,
         warning: colors.amber,

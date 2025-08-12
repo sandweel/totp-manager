@@ -21,7 +21,7 @@
       <div class="overflow-x-auto">
         <table class="min-w-full border-separate border-spacing-y-2" id="totp-table">
           <thead>
-            <tr class="text-sm text-gray-600">
+            <tr class="text-sm text-gray-600 bg-info-200">
               <th class="px-4 py-2 text-center">
                 <div class="checkbox-wrapper-45">
                   <input id="select-all" type="checkbox" />
@@ -61,7 +61,7 @@
               </td>
               <td class="px-4 py-3 text-center align-middle code-cell">
                 <div class="relative group inline-block">
-                  <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-info-300 transition">
+                  <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm bg-info-200 group-hover:bg-info-300 transition">
                     {{ t.code }}
                   </code>
                 </div>
@@ -77,13 +77,13 @@
               <td class="px-4 py-3 text-center rounded-r-lg">
                 <div class="flex gap-2 justify-center">
                   {% if t.is_shared %}
-                  <button onclick="showSharedUsers({{ t.id }})" class="bg-info-500 hover:bg-info-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn">
+                  <button onclick="showSharedUsers({{ t.id }})" class="bg-info-500 hover:bg-info-600 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition shared-btn">
                     Shared
                   </button>
                   {% endif %}
                   <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
                     <input type="hidden" name="ids" value="{{ t.id }}">
-                    <button type="submit" class="bg-danger-500 hover:bg-danger-400 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
+                    <button type="submit" class="bg-danger-500 hover:bg-danger-600 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
                       Delete
                     </button>
                   </form>
@@ -99,7 +99,7 @@
       <div class="overflow-x-auto">
         <table class="min-w-full border-separate border-spacing-y-2" id="shared-totp-table">
           <thead>
-            <tr class="text-sm text-gray-600">
+            <tr class="text-sm text-gray-600 bg-info-200">
               <th class="text-left px-4 py-2">Account / Issuer</th>
               <th class="text-center px-4 py-2">Owner</th>
               <th class="text-center px-4 py-2">Current Code</th>
@@ -120,7 +120,7 @@
               </td>
               <td class="px-4 py-3 text-center align-middle code-cell">
                 <div class="relative group inline-block">
-                  <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm group-hover:bg-info-300 transition">
+                  <code onclick="copyCode(this)" class="cursor-pointer bg-info-100 text-primary px-3 py-1 rounded-full font-mono text-sm bg-info-200 group-hover:bg-info-300 transition">
                     {{ t.code }}
                   </code>
                 </div>
@@ -151,13 +151,13 @@
       </form>
             <form id="share-selected-form" method="post" action="/totp/share" class="flex items-center gap-4">
         <input type="hidden" name="totp_ids" id="share-ids">
-        <button type="button" id="share-btn" class="bg-info-500 hover:bg-info-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
+        <button type="button" id="share-btn" class="bg-info-500 hover:bg-info-600 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
           Share selected
         </button>
       </form>
       <form id="delete-selected-form" method="post" action="/totp/delete" class="flex items-center gap-4">
         <input type="hidden" name="ids" id="delete-ids">
-        <button type="submit" id="delete-selected-btn" onclick="return confirm('Are you sure you want to delete selected item(s)?');" class="bg-danger-500 hover:bg-danger-400 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
+        <button type="submit" id="delete-selected-btn" onclick="return confirm('Are you sure you want to delete selected item(s)?');" class="bg-danger-500 hover:bg-danger-600 text-white px-5 py-2 rounded-md text-sm shadow-md opacity-50 cursor-not-allowed" disabled>
           Delete selected
         </button>
       </form>
@@ -176,7 +176,7 @@
         </div>
         <div class="flex justify-end gap-2">
           <button type="button" id="share-cancel" class="px-4 py-2">Cancel</button>
-          <button type="submit" class="bg-primary text-white px-4 py-2 rounded">Share</button>
+          <button type="submit" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded">Share</button>
         </div>
       </form>
     </div>
@@ -205,7 +205,7 @@
         </div>
         <div class="flex justify-end gap-2">
           <button type="button" id="import-cancel" class="px-4 py-2">Cancel</button>
-          <button type="submit" class="bg-primary text-white px-4 py-2 rounded">Import</button>
+          <button type="submit" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded">Import</button>
         </div>
       </form>
     </div>
