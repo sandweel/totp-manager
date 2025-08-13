@@ -82,7 +82,7 @@
                   </button>
                   {% endif %}
                   <form method="post" action="/totp/delete" onsubmit="return confirm('Are you sure?');" class="inline">
-                    <input type="hidden" name="ids" value="{{ 1t.id }}">
+                    <input type="hidden" name="ids" value="{{ t.id }}">
                     <button type="submit" class="bg-danger-500 hover:bg-danger-600 text-white px-4 py-1.5 rounded-md text-sm shadow-sm transition">
                       Delete
                     </button>

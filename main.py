@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
-from starlette.status import HTTP_404_NOT_FOUND, HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
 from starlette.middleware.sessions import SessionMiddleware
 
 from config import templates, settings
@@ -48,10 +47,14 @@ async def auth_middleware(request: Request, call_next):
 ### Exceptions such as 403, 404
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException, user: Optional[User] = Depends(get_current_user_if_exists)):
-    if exc.status_code == HTTP_404_NOT_FOUND:
+    if exc.status_code == 404:
         return templates.TemplateResponse(
             "errors/404.html", {"request": request, "user": user}, status_code=404
         )
+    if exc.status_code in {301, 302, 303, 307, 308}:
+        location = exc.headers.get("Location", "/")
+        return RedirectResponse(url=location, status_code=exc.status_code)
+
     return templates.TemplateResponse(
         "errors/generic.html", {"request": request, "user": user, "status_code": exc.status_code},
         status_code=exc.status_code
@@ -64,7 +67,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return templates.TemplateResponse(
         "errors/422.html",
         {"request": request, "errors": exc.errors(), "user": user},
-        status_code=HTTP_422_UNPROCESSABLE_ENTITY
+        status_code=422
     )
 ### Any exceptions
 @app.exception_handler(Exception)
@@ -74,7 +77,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     return templates.TemplateResponse(
         "errors/500.html",
         {"request": request},
-        status_code=HTTP_500_INTERNAL_SERVER_ERROR
+        status_code=500
     )
 
 @app.get("/", response_class=HTMLResponse)
