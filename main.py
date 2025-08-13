@@ -1,19 +1,26 @@
 import uvicorn
+import logging
+from typing import Optional
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
-from starlette.status import HTTP_404_NOT_FOUND, HTTP_422_UNPROCESSABLE_ENTITY
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_422_UNPROCESSABLE_ENTITY, HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.middleware.sessions import SessionMiddleware
 
 from config import templates, settings
 from routes.auth import router as auth_router, get_current_user_if_exists
 from routes.totp import router as totp_router
 from routes.api import router as api_router
 from models import User
-from typing import Optional
-from starlette.middleware.sessions import SessionMiddleware
 
+logging.basicConfig(
+    filename="logs/error.log",
+    level=logging.ERROR,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y/%m/%d %H:%M:%S"
+)
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
@@ -25,33 +32,50 @@ app.include_router(api_router)
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-#    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path in ["/", "/openapi.json", "/docs", "/docs/oauth2-redirect"]:
-    if request.url.path.startswith("/auth") or request.url.path.startswith("/static") or request.url.path.startswith("/docs") or request.url.path in ["/", "/openapi.json"]:
+    if (
+        request.url.path.startswith("/auth")
+        or request.url.path.startswith("/static")
+#        or request.url.path.startswith("/docs")
+#        or request.url.path in ["/", "/openapi.json"]
+    ):
         return await call_next(request)
     token = request.cookies.get("access_token")
     if not token:
         return RedirectResponse(url="/auth/login")
-    try:
-        return await call_next(request)
-    except:
-        return RedirectResponse(url="/auth/login")
 
+    return await call_next(request)
+
+### Exceptions such as 403, 404
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException, user: Optional[User] = Depends(get_current_user_if_exists)):
-    user = await get_current_user_if_exists(request)
     if exc.status_code == HTTP_404_NOT_FOUND:
-        return templates.TemplateResponse("errors/404.html", {"request": request, "user": user}, status_code=404)
-    raise exc
+        return templates.TemplateResponse(
+            "errors/404.html", {"request": request, "user": user}, status_code=404
+        )
+    return templates.TemplateResponse(
+        "errors/generic.html", {"request": request, "user": user, "status_code": exc.status_code},
+        status_code=exc.status_code
+    )
 
-
+### Validation (422) errors
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     user = await get_current_user_if_exists(request)
-    return templates.TemplateResponse("errors/422.html", {
-        "request": request,
-        "errors": exc.errors(),
-        "user": user,
-    }, status_code=HTTP_422_UNPROCESSABLE_ENTITY)
+    return templates.TemplateResponse(
+        "errors/422.html",
+        {"request": request, "errors": exc.errors(), "user": user},
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY
+    )
+### Any exceptions
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logging.exception(f"Unhandled error for request: {request.url}")
+
+    return templates.TemplateResponse(
+        "errors/500.html",
+        {"request": request},
+        status_code=HTTP_500_INTERNAL_SERVER_ERROR
+    )
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, user: Optional[User] = Depends(get_current_user_if_exists)):
