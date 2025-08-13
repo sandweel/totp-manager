@@ -11,6 +11,7 @@ protobuf==6.31.1
 pyotp
 python-dotenv
 python-jose
+pillow
 qrcode
 sqlalchemy[asyncio]
 uvicorn[standard]
