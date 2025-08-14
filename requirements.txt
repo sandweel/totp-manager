@@ -7,11 +7,12 @@ httpx
 itsdangerous
 jinja2
 passlib
+pillow
 protobuf==6.31.1
 pyotp
 python-dotenv
 python-jose
-pillow
+python-multipart
 qrcode
 sqlalchemy[asyncio]
 uvicorn[standard]
