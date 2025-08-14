@@ -28,7 +28,7 @@ except ValueError:
     raw = base64.b64decode(settings.ENCRYPTION_KEY)
     master_fernet = Fernet(base64.urlsafe_b64encode(raw))
 
-engine = create_async_engine(settings.DATABASE_URL, future=True, echo=False)
+engine = create_async_engine(settings.DATABASE_URL, future=True, echo=False, pool_pre_ping=True, pool_recycle=3600)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
