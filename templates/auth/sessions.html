@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Sessions{% endblock %}
+{% block content %}
+<div class="bg-white shadow-xl rounded-xl p-6 max-w-5xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-primary">Your Sessions</h1>
+    <form method="post" action="/auth/sessions/revoke-all" onsubmit="return confirm('Revoke all sessions?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="bg-danger-500 hover:bg-danger-600 text-white px-4 py-2 rounded-md">Revoke All</button>
+    </form>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full border-separate border-spacing-y-2">
+      <thead>
+        <tr class="text-sm text-gray-600 bg-info-200">
+          <th class="text-left px-4 py-2">Device</th>
+          <th class="text-left px-4 py-2">IP</th>
+          <th class="text-left px-4 py-2">Created</th>
+          <th class="text-left px-4 py-2">Last Used</th>
+          <th class="text-left px-4 py-2">Expires</th>
+          <th class="text-center px-4 py-2">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr class="bg-gray-100 rounded-lg shadow-sm">
+          <td class="px-4 py-3">
+            <div class="font-medium">{{ s.user_agent or 'Unknown' }}</div>
+            {% if current_sid == s.id %}
+            <div class="text-xs text-success-700">This device</div>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3">{{ s.ip or '-' }}</td>
+          <td class="px-4 py-3">{{ s.created_at }}</td>
+          <td class="px-4 py-3">{{ s.last_used_at }}</td>
+          <td class="px-4 py-3">{{ s.expires_at }}</td>
+          <td class="px-4 py-3 text-center">
+            <form method="post" action="/auth/sessions/{{ s.id }}/revoke" onsubmit="return confirm('Revoke this session?');" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="bg-danger-500 hover:bg-danger-600 text-white px-4 py-1.5 rounded-md text-sm">Revoke</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not sessions %}
+        <tr>
+          <td colspan="6" class="px-4 py-6 text-center text-gray-500">No active sessions</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
