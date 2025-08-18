@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
 from config import templates, settings
-from routes.auth import router as auth_router, get_current_user_if_exists, set_auth_cookies_in_response_if_needed
+from routes.auth import router as auth_router, get_current_user_if_exists, set_auth_cookies
 from routes.totp import router as totp_router
 from routes.api import router as api_router
 from routes.sessions import router as sessions_router
@@ -32,8 +32,22 @@ app.include_router(sessions_router)
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    response = await call_next(request)
-    set_auth_cookies_in_response_if_needed(request, response)
+    allowlisted = (
+        request.url.path.startswith("/auth")
+        or request.url.path.startswith("/static")
+        or request.url.path in ["/favicon.ico"]
+    )
+    if allowlisted:
+        response = await call_next(request)
+    else:
+        access_cookie = request.cookies.get("access_token")
+        refresh_cookie = request.cookies.get("refresh_token")
+        if not access_cookie and not refresh_cookie:
+            return RedirectResponse(url="/auth/login")
+        response = await call_next(request)
+    tokens = getattr(request.state, "new_tokens", None)
+    if tokens:
+        set_auth_cookies(response, tokens[0], tokens[1])
     return response
 
 @app.exception_handler(HTTPException)
@@ -58,6 +72,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         {"request": request, "errors": exc.errors(), "user": user},
         status_code=422
     )
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logging.exception(f"Unhandled error for request: {request.url}")

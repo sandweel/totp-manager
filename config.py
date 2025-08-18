@@ -14,16 +14,13 @@ class Settings:
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
     SECRET_KEY: str = os.getenv("SECRET_KEY")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "5"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
-    ACCESS_TOKEN_COOKIE_NAME: str = os.getenv("ACCESS_TOKEN_COOKIE_NAME", "access_token")
-    REFRESH_TOKEN_COOKIE_NAME: str = os.getenv("REFRESH_TOKEN_COOKIE_NAME", "refresh_token")
-    CSRF_REFRESH_COOKIE_NAME: str = os.getenv("CSRF_REFRESH_COOKIE_NAME", "csrf_refresh")
-    REFRESH_TOKEN_PEPPER: str = os.getenv("REFRESH_TOKEN_PEPPER", "")
     MAILGUN_API_KEY: str = os.getenv("MAILGUN_API_KEY")
     MAILGUN_DOMAIN: str = os.getenv("MAILGUN_DOMAIN")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:8000")
     PORT: str = os.getenv("PORT", "8000")
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
 
 settings = Settings()
 

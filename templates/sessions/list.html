@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mx-auto max-w-5xl py-6">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-semibold">Sessions</h1>
+    <form action="/auth/sessions/revoke-all" method="post">
+      <button class="px-4 py-2 bg-red-600 text-white rounded">Revoke all</button>
+    </form>
+  </div>
+  <div class="overflow-x-auto bg-white rounded shadow">
+    <table class="min-w-full">
+      <thead>
+        <tr class="text-left text-sm text-gray-600">
+          <th class="px-4 py-3">Status</th>
+          <th class="px-4 py-3">IP</th>
+          <th class="px-4 py-3">User Agent</th>
+          <th class="px-4 py-3">Last Used</th>
+          <th class="px-4 py-3 text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="text-sm">
+        {% for s in sessions %}
+        {% set is_active = (s.revoked_at is none) and (s.replaced_by_session_id is none) and (s.refresh_token_expires_at > now) %}
+        {% if is_active %}
+        {% set is_current = (current_sid is not none) and (s.session_id == current_sid) %}
+        <tr class="border-t">
+          <td class="px-4 py-3">
+            {% if is_current %}
+              <span class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Current</span>
+            {% endif %}
+            <span class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-xs ml-1">Active</span>
+          </td>
+          <td class="px-4 py-3">{{ s.ip or "—" }}</td>
+          <td class="px-4 py-3">{{ s.user_agent or "—" }}</td>
+          <td class="px-4 py-3">{{ s.last_used_at.strftime("%Y-%m-%d %H:%M:%S") if s.last_used_at else "—" }}</td>
+          <td class="px-4 py-3 text-center">
+            <form action="/auth/sessions/{{ s.session_id }}/revoke" method="post" class="inline-block">
+              <button class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs">Revoke</button>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

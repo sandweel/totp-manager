@@ -1,84 +1,64 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Request, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy import select, update
-from typing import Optional
-from config import templates
-from models import AuthSession, User
-from routes.auth import get_authenticated_user, now_utc, clear_auth_cookies
-from services.flash import flash, get_flashed_message
-from config import async_session, settings
+from typing import Optional, List
+from datetime import datetime
+from config import async_session, templates
+from models import Session as SessionDB, User
+from routes.auth import get_authenticated_user, clear_auth_cookies
 
-router = APIRouter(prefix="/auth", tags=["sessions"])
+router = APIRouter(prefix="/auth/sessions", tags=["sessions"])
 
-def ensure_csrf(request: Request):
-    if "_csrf" not in request.session:
-        import secrets
-        request.session["_csrf"] = secrets.token_urlsafe(24)
-    return request.session["_csrf"]
+def now_utc():
+    return datetime.utcnow()
 
-def validate_csrf(request: Request, token: str):
-    stored = request.session.get("_csrf")
-    return stored and token and stored == token
-
-@router.get("/sessions", response_class=HTMLResponse)
-async def sessions_page(request: Request, user: User = Depends(get_authenticated_user)):
-    async with async_session() as session:
-        result = await session.execute(
-            select(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)).order_by(AuthSession.last_used_at.desc())
+@router.get("", response_class=HTMLResponse)
+async def list_sessions(request: Request, user: User = Depends(get_authenticated_user)):
+    async with async_session() as db:
+        result = await db.execute(
+            select(SessionDB).where(SessionDB.user_id == user.id).order_by(SessionDB.created_at.desc())
         )
-        rows = result.scalars().all()
-    csrf = ensure_csrf(request)
-    flash_data = get_flashed_message(request)
-    current_sid = None
-    token = request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
-    if token:
-        from jose import jwt
-        try:
-            token_value = token.split(" ")[1] if " " in token else token
-            payload = jwt.decode(token_value, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            current_sid = payload.get("sid")
-        except Exception:
-            current_sid = None
-    return templates.TemplateResponse("auth/sessions.html", {"request": request, "user": user, "sessions": rows, "csrf_token": csrf, "current_sid": current_sid, "flash": flash_data})
+        sessions: List[SessionDB] = result.scalars().all()
+    current_sid = getattr(request.state, "current_sid", None)
+    return templates.TemplateResponse(
+        "sessions/list.html",
+        {
+            "request": request,
+            "user": user,
+            "sessions": sessions,
+            "current_sid": current_sid,
+            "now": now_utc(),
+        },
+    )
 
-@router.post("/sessions/revoke-all")
-async def revoke_all_sessions(request: Request, csrf_token: str = Form(...), user: User = Depends(get_authenticated_user)):
-    if not validate_csrf(request, csrf_token):
-        raise HTTPException(status_code=400, detail="Invalid CSRF token")
-    async with async_session() as session_db:
-        await session_db.execute(update(AuthSession).where(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)).values(revoked_at=now_utc()))
-        await session_db.commit()
-    resp = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
-    clear_auth_cookies(resp)
-    return resp
-
-@router.post("/sessions/{session_id}/revoke")
-async def revoke_session(session_id: str, request: Request, csrf_token: str = Form(...), user: User = Depends(get_authenticated_user)):
-    if not validate_csrf(request, csrf_token):
-        raise HTTPException(status_code=400, detail="Invalid CSRF token")
-    async with async_session() as session_db:
-        result = await session_db.execute(select(AuthSession).where(AuthSession.id == session_id, AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)))
-        row = result.scalars().first()
-        if not row:
-            flash(request, "Session not found or already revoked", "error")
-            return RedirectResponse(url="/auth/sessions", status_code=status.HTTP_303_SEE_OTHER)
-        row.revoked_at = now_utc()
-        session_db.add(row)
-        await session_db.commit()
-    token = request.cookies.get(settings.ACCESS_TOKEN_COOKIE_NAME)
-    current_sid = None
-    if token:
-        from jose import jwt
-        try:
-            token_value = token.split(" ")[1] if " " in token else token
-            payload = jwt.decode(token_value, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            current_sid = payload.get("sid")
-        except Exception:
-            current_sid = None
-    if current_sid == session_id:
-        resp = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
-        from routes.auth import clear_auth_cookies
-        clear_auth_cookies(resp)
-        return resp
-    flash(request, "Session revoked", "success")
+@router.post("/{session_id}/revoke")
+async def revoke_session(request: Request, session_id: str, user: User = Depends(get_authenticated_user)):
+    async with async_session() as db:
+        result = await db.execute(
+            select(SessionDB).where(SessionDB.user_id == user.id, SessionDB.session_id == session_id)
+        )
+        s = result.scalars().first()
+        if not s:
+            raise HTTPException(status_code=404, detail="Not found")
+        if s.revoked_at is None:
+            await db.execute(
+                update(SessionDB).where(SessionDB.id == s.id).values(revoked_at=now_utc())
+            )
+            await db.commit()
+    current_sid = getattr(request.state, "current_sid", None)
+    if current_sid and current_sid == session_id:
+        response = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
+        clear_auth_cookies(response)
+        return response
     return RedirectResponse(url="/auth/sessions", status_code=status.HTTP_303_SEE_OTHER)
+
+@router.post("/revoke-all")
+async def revoke_all_sessions(request: Request, user: User = Depends(get_authenticated_user)):
+    async with async_session() as db:
+        await db.execute(
+            update(SessionDB).where(SessionDB.user_id == user.id, SessionDB.revoked_at.is_(None)).values(revoked_at=now_utc())
+        )
+        await db.commit()
+    response = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
+    clear_auth_cookies(response)
+    return response
