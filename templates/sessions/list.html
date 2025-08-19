@@ -31,12 +31,14 @@
             <span class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-xs ml-1">Active</span>
           </td>
           <td class="px-4 py-3">{{ s.ip or "—" }}</td>
-          <td class="px-4 py-3">{{ s.user_agent or "—" }}</td>
+          <td class="px-4 py-3" title="{{ s.user_agent or '' }}">{{ s.user_agent | ua_pretty }}</td>
           <td class="px-4 py-3">{{ s.last_used_at.strftime("%Y-%m-%d %H:%M:%S") if s.last_used_at else "—" }}</td>
           <td class="px-4 py-3 text-center">
+            {% if not is_current %}
             <form action="/auth/sessions/{{ s.session_id }}/revoke" method="post" class="inline-block">
               <button class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs">Revoke</button>
             </form>
+            {% endif %}
           </td>
         </tr>
         {% endif %}

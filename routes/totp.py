@@ -5,7 +5,7 @@ from starlette.responses import StreamingResponse
 from config import templates
 from services.flash import flash, get_flashed_message
 from services.totp_service import TotpService
-from routes.auth import get_authenticated_user
+from services.auth import get_authenticated_user
 from services.validator import validate_totp
 from services.import_export import build_migration_uri, build_qr_png, decode_migration_uri
 

@@ -15,4 +15,6 @@ python-jose
 python-multipart
 qrcode
 sqlalchemy[asyncio]
+starlette
+user-agents
 uvicorn[standard]

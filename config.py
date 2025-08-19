@@ -7,6 +7,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from fastapi.templating import Jinja2Templates
 import httpx
 
+from services.ua import ua_pretty
+
 load_dotenv()
 
 class Settings:
@@ -35,5 +37,6 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 Base = declarative_base()
 
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["ua_pretty"] = ua_pretty
 
 http_client = httpx.AsyncClient()

@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import datetime
 from config import async_session, templates
 from models import Session as SessionDB, User
-from routes.auth import get_authenticated_user, clear_auth_cookies
+from services.auth import get_authenticated_user, clear_auth_cookies
 
 router = APIRouter(prefix="/auth/sessions", tags=["sessions"])
 
