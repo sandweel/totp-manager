@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from fastapi import Request, HTTPException, status, Response
 from jose import jwt
 from jose.exceptions import JWTError, ExpiredSignatureError
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 from config import settings, async_session
 from models import User, Session as SessionDB
@@ -64,7 +65,7 @@ def clear_auth_cookies(response: Response):
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")
 
-async def persist_new_session(user: User, request: Request, parent_session_id: Optional[str] = None):
+async def persist_new_session_tx(db: AsyncSession, user: User, request: Request, parent_session_id: Optional[str] = None) -> Tuple[str, str, str]:
     session_id = str(uuid.uuid4())
     jti = str(uuid.uuid4())
     refresh = create_refresh_token(
@@ -73,22 +74,27 @@ async def persist_new_session(user: User, request: Request, parent_session_id: O
         jti=jti,
         expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
-    async with async_session() as db:
-        row = SessionDB(
-            session_id=session_id,
-            user_id=user.id,
-            refresh_token_hash=hash_token(refresh),
-            refresh_token_expires_at=now_utc() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-            created_at=now_utc(),
-            last_used_at=now_utc(),
-            ip=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-            parent_session_id=parent_session_id,
-        )
-        db.add(row)
-        await db.commit()
+    row = SessionDB(
+        session_id=session_id,
+        user_id=user.id,
+        refresh_token_hash=hash_token(refresh),
+        refresh_token_expires_at=now_utc() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=now_utc(),
+        last_used_at=now_utc(),
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        parent_session_id=parent_session_id,
+    )
+    db.add(row)
+    await db.flush()
     access = create_access_token({"sub": str(user.id), "sid": session_id})
     return access, refresh, session_id
+
+async def persist_new_session(user: User, request: Request, parent_session_id: Optional[str] = None):
+    async with async_session() as db:
+        async with db.begin():
+            access, refresh, session_id = await persist_new_session_tx(db, user, request, parent_session_id)
+        return access, refresh, session_id
 
 async def try_refresh_from_cookies(request: Request) -> Optional[User]:
     refresh_token = request.cookies.get("refresh_token")
@@ -108,31 +114,34 @@ async def try_refresh_from_cookies(request: Request) -> Optional[User]:
     except JWTError:
         return None
     async with async_session() as db:
-        result = await db.execute(
-            select(SessionDB, User).join(User, User.id == SessionDB.user_id).where(
-                SessionDB.session_id == sid, SessionDB.user_id == user_id
+        async with db.begin():
+            stmt = (
+                select(SessionDB, User)
+                .join(User, User.id == SessionDB.user_id)
+                .where(SessionDB.session_id == sid, SessionDB.user_id == user_id)
+                .with_for_update()
             )
-        )
-        row = result.first()
-        if not row:
-            return None
-        db_sess, user = row
-        if db_sess.revoked_at is not None:
-            return None
-        if db_sess.replaced_by_session_id is not None:
-            return None
-        if db_sess.refresh_token_expires_at <= now_utc():
-            return None
-        if db_sess.refresh_token_hash != hash_token(refresh_token):
-            return None
-        parent_sid = db_sess.session_id
-        access, new_refresh, new_sid = await persist_new_session(user, request, parent_session_id=parent_sid)
-        await db.execute(
-            update(SessionDB)
-            .where(SessionDB.id == db_sess.id)
-            .values(revoked_at=now_utc(), replaced_by_session_id=new_sid, last_used_at=now_utc())
-        )
-        await db.commit()
+            result = await db.execute(stmt)
+            row = result.first()
+            if not row:
+                return None
+            db_sess, user = row
+            if db_sess.revoked_at is not None:
+                return None
+            if db_sess.refresh_token_expires_at <= now_utc():
+                return None
+            if db_sess.refresh_token_hash != hash_token(refresh_token):
+                return None
+            if db_sess.replaced_by_session_id is not None:
+                request.state.current_sid = db_sess.replaced_by_session_id
+                return user
+            parent_sid = db_sess.session_id
+            access, new_refresh, new_sid = await persist_new_session_tx(db, user, request, parent_session_id=parent_sid)
+            await db.execute(
+                update(SessionDB)
+                .where(SessionDB.id == db_sess.id)
+                .values(revoked_at=now_utc(), replaced_by_session_id=new_sid, last_used_at=now_utc())
+            )
     request.state.new_tokens = (access, new_refresh)
     request.state.current_sid = new_sid
     return user
