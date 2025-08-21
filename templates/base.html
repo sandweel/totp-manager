@@ -6,12 +6,18 @@
   <title>{% block title %}TOTP Manager{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
   <script src="{{ url_for('static', path='js/toast.js') }}"></script>
+  <script>
+    function toggleMenu() {
+      document.getElementById("mobile-menu").classList.toggle("hidden");
+    }
+  </script>
 </head>
 <body class="bg-zinc-200 text-slate-500 font-sans min-h-screen">
   <nav class="bg-primary text-primary-text sticky top-0 z-30 shadow-md">
     <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
       <a href="/" class="text-2xl font-bold tracking-wide">🔐 TOTP Manager</a>
-      <div class="flex gap-6 text-lg">
+      <button class="md:hidden text-3xl focus:outline-none" onclick="toggleMenu()">☰</button>
+      <div class="hidden md:flex gap-6 text-lg">
         {% if user %}
           <a href="/totp/create" class="hover:text-primary-text-hover transition">Create</a>
           <a href="/totp/list" class="hover:text-primary-text-hover transition">My TOTPs</a>
@@ -22,6 +28,17 @@
           <a href="/auth/register" class="hover:text-primary-text-hover transition">Register</a>
         {% endif %}
       </div>
+    </div>
+    <div id="mobile-menu" class="hidden md:hidden flex flex-col px-4 pb-4 space-y-3 text-lg bg-primary">
+      {% if user %}
+        <a href="/totp/create" class="hover:text-primary-text-hover transition">Create</a>
+        <a href="/totp/list" class="hover:text-primary-text-hover transition">My TOTPs</a>
+        <a href="/auth/sessions" class="hover:text-primary-text-hover transition">Sessions</a>
+        <a href="/auth/logout" class="hover:text-primary-text-hover transition">Logout</a>
+      {% else %}
+        <a href="/auth/login" class="hover:text-primary-text-hover transition">Login</a>
+        <a href="/auth/register" class="hover:text-primary-text-hover transition">Register</a>
+      {% endif %}
     </div>
   </nav>
   <main class="max-w-5xl mx-auto px-4 py-10 mt-6">
