@@ -40,6 +40,7 @@ jobs:
             if ! circusctl restart 2fa; then
               echo "✖ circusctl restart failed"; exit 1
             fi
+            sleep 5
 
             echo "check circusctl status 2fa"
             status_out="$(circusctl status 2fa || true)"
