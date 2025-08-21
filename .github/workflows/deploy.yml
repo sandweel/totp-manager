@@ -29,8 +29,10 @@ jobs:
 
             echo "build tailwindcss"
             cd tailwindcss
-            /home/2fa/.nvm/versions/node/v24.5.0/bin/npm install
-            /home/2fa/.nvm/versions/node/v24.5.0/bin/npm run build
+            export NVM_DIR="$HOME/.nvm"
+            source "$NVM_DIR/nvm.sh"
+            npm install
+            npm run build
 
             cd /home/2fa/totp-manager
 
