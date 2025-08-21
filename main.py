@@ -1,13 +1,14 @@
 import uvicorn
 import logging
 from typing import Optional
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, JSONResponse
+
 from config import templates, settings
 from routes.auth import router as auth_router, get_current_user_if_exists, set_auth_cookies
 from routes.totp import router as totp_router
@@ -35,7 +36,7 @@ async def auth_middleware(request: Request, call_next):
     allowlisted = (
         request.url.path.startswith("/auth")
         or request.url.path.startswith("/static")
-        or request.url.path in ["/favicon.ico"]
+        or request.url.path in ["/favicon.ico", "/health"]
     )
     if allowlisted:
         response = await call_next(request)
@@ -85,6 +86,11 @@ async def global_exception_handler(request: Request):
 @app.get("/favicon.ico")
 async def favicon():
     return FileResponse("static/media/favicon/favicon.ico")
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+@app.head("/health", status_code=status.HTTP_200_OK)
+async def health_check():
+    return JSONResponse(content={"status": "ok"})
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request, user: Optional[User] = Depends(get_current_user_if_exists)):
