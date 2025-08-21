@@ -29,8 +29,8 @@ jobs:
 
             echo "build tailwindcss"
             cd tailwindcss
-            export NVM_DIR="$HOME/.nvm"
-            source "$NVM_DIR/nvm.sh"
+            source "$HOME/.nvm/nvm.sh"
+            source "$HOME/venv/bin/activate"
             npm install
             npm run build
 
