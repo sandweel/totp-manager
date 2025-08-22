@@ -24,6 +24,13 @@ class Settings:
     PORT: str = os.getenv("PORT", "8000")
     COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() in ("1", "true", "yes")
 
+    _ALLOWED_EMAIL_DOMAINS_RAW: str = os.getenv("ALLOWED_EMAIL_DOMAINS", "")
+    ALLOWED_EMAIL_DOMAINS = [
+        d.strip().lower()
+        for d in _ALLOWED_EMAIL_DOMAINS_RAW.split(",")
+        if d.strip()
+    ]
+
 settings = Settings()
 
 try:

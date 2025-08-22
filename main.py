@@ -23,7 +23,13 @@ logging.basicConfig(
     datefmt="%Y/%m/%d %H:%M:%S"
 )
 
-app = FastAPI()
+app = (FastAPI(
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+    )
+)
+
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth_router)

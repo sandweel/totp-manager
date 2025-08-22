@@ -11,7 +11,7 @@ import uuid
 from config import settings, async_session, templates, master_fernet, http_client
 from models import User, Session as SessionDB
 from services.flash import flash, get_flashed_message
-from services.validator import validate_password
+from services.validator import validate_password, validate_email
 from services.auth import (
     now_utc,
     create_access_token,
@@ -37,6 +37,16 @@ async def post_register(request: Request, email: str = Form(...), password: str 
                         user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
+    email_msg = validate_email(email)
+    if email_msg:
+        flash(request, email_msg, "error")
+        flash_data = get_flashed_message(request)
+        return templates.TemplateResponse(
+            "auth/register.html",
+            {"request": request, "flash": flash_data, "email": email},
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
     if password != confirm_password:
         flash(request, "Passwords do not match", "error")
         flash_data = get_flashed_message(request)

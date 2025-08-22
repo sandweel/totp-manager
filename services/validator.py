@@ -1,5 +1,22 @@
 import re
 from typing import Optional
+from config import settings
+
+_email_re = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+def validate_email(email: str) -> Optional[str]:
+    email = (email or "").strip()
+    if not _email_re.match(email):
+        return "Invalid email address"
+    allowed = getattr(settings, "ALLOWED_EMAIL_DOMAINS", []) or []
+    if allowed:
+        try:
+            domain = email.split("@", 1)[1].lower()
+        except IndexError:
+            return "Invalid email address"
+        if domain not in allowed:
+            return f"Registration with this email domain is not allowed."
+    return None
 
 def validate_password(password: str) -> Optional[str]:
     if len(password) < 10:
