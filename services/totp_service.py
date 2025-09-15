@@ -98,6 +98,19 @@ class TotpService:
             return False
 
     @staticmethod
+    async def update(item_id: int, account: str, user: User):
+        async with async_session() as session:
+            result = await session.execute(
+                select(TOTPItem).where(TOTPItem.id == item_id, TOTPItem.user_id == user.id)
+            )
+            totp_item = result.scalars().first()
+            if not totp_item:
+                return False, "TOTP item not found."
+            totp_item.account = account
+            await session.commit()
+            return True, "Updated successfully."
+
+    @staticmethod
     async def export_raw(user: User, ids: list[int]):
         async with async_session() as session:
             user_fernet = Fernet(master_fernet.decrypt(user.encrypted_dek.encode()))

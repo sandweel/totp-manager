@@ -32,19 +32,19 @@ function normalizeList(json){
   }
   return [];
 }
-function getItemId(it){return String(it.id??it.totp_id??it.totpId??it.tid??"");}
-function getItemCode(it){return String(it.code??it.current_code??it.value??it.otp??it.token??"");}
+const getItemId=it=>String(it.id??it.totp_id??it.totpId??it.tid??"");
+const getItemCode=it=>String(it.code??it.current_code??it.value??it.otp??it.token??"");
 function findCodeEl(row){return row.querySelector(".totp-code")||row.querySelector(".code-cell code")||row.querySelector("td:nth-child(3) code")||row.querySelector("code");}
 
 async function fetchTotpData(endpoint){
-  try{const d=await fetchJSON(endpoint);return normalizeList(d);}catch(err){console.error("Failed to fetch TOTP:",err);const table=endpoint.includes("shared")?"#shared-totp-table":"#totp-table";return [...$$(table+" tbody tr")].map(row=>({id:row.dataset.id,code:"Error"}));}
+  try{return normalizeList(await fetchJSON(endpoint));}
+  catch(err){console.error("Failed to fetch TOTP:",err);const table=endpoint.includes("shared")?"#shared-totp-table":"#totp-table";return [...$$(table+" tbody tr")].map(row=>({id:row.dataset.id,code:"Error"}));}
 }
+
 function updateCodes(data,tableSelector){
-  const list=normalizeList(data);
+  const map=new Map(normalizeList(data).map(i=>[getItemId(i),getItemCode(i)]));
   $$(tableSelector+" tbody tr").forEach(row=>{
-    const id=row.dataset.id;
-    const it=list.find(i=>getItemId(i)===id);
-    const code=it?getItemCode(it):"";
+    const code=map.get(row.dataset.id)||"";
     const codeEl=findCodeEl(row);
     if(codeEl&&code&&codeEl.textContent!==code){
       codeEl.textContent=code;
@@ -54,16 +54,18 @@ function updateCodes(data,tableSelector){
 }
 
 function isMyTabActive(){return !$("#my-codes").classList.contains("hidden");}
-function rowCheckboxes(){return $$("#totp-table .row-check");}
 function mobileSelectWrap(){const m=$("#select-all-mobile");return m?m.closest(".md\\:hidden"):null;}
 function toggleMobileSelectVisible(v){const wrap=mobileSelectWrap();if(!wrap)return;wrap.classList.toggle("hidden",!v);}
 
-let lastCycle=0;
-function refreshCodes(){fetchTotpData("/totp/list-all").then(d=>updateCodes(d,"#totp-table"));fetchTotpData("/totp/list-shared-with-me").then(d=>updateCodes(d,"#shared-totp-table"))}
+let lastCycle=0,progressEls=null;
+function refreshCodes(){
+  fetchTotpData("/totp/list-all").then(d=>updateCodes(d,"#totp-table"));
+  fetchTotpData("/totp/list-shared-with-me").then(d=>updateCodes(d,"#shared-totp-table"));
+}
 function animateProgress(){
   const now=Date.now();
   const offset=FULL_DASH_ARRAY*((now%PERIOD)/PERIOD);
-  $$(".countdown-ring__progress").forEach(c=>{c.style.strokeDashoffset=offset;});
+  (progressEls||(progressEls=$$(".countdown-ring__progress"))).forEach(c=>{c.style.strokeDashoffset=offset;});
   const currentCycle=Math.floor(now/PERIOD);
   if(currentCycle!==lastCycle){lastCycle=currentCycle;refreshCodes();}
   requestAnimationFrame(animateProgress);
@@ -121,9 +123,8 @@ async function unshareTotp(totpId,email){
 window.unshareTotp=unshareTotp;
 
 document.addEventListener("DOMContentLoaded",()=>{
-  refreshCodes();
-  animateProgress();
-
+  const totpTable=$("#totp-table");
+  const sharedTable=$("#shared-totp-table");
   const selectAll=$("#select-all");
   const selectAllMobile=$("#select-all-mobile");
   const exportBar=$("#export-bar");
@@ -134,43 +135,95 @@ document.addEventListener("DOMContentLoaded",()=>{
   const deleteIdsInput=$("#delete-ids");
   const shareIdsInput=$("#share-ids");
   const exportCancel=$("#export-cancel");
+  const mySearch=$("#my-codes-search");
+  const sharedSearch=$("#shared-codes-search");
+  const exportForm=$("#export-selected-form");
+  const importModal=$("#import-modal");
+  const fileInput=$("#import-file");
+  const textInput=$("#import-text");
+  const importBtn=$("#import-btn");
+  const importCancel=$("#import-cancel");
+
+  const rowChecks=()=>Array.from(totpTable.querySelectorAll("tbody tr")).filter(row=>row.style.display!=="none"&&!row.classList.contains("hidden")).map(row=>row.querySelector(".row-check")).filter(Boolean);
 
   function updateExportState(){
-    const ids=rowCheckboxes().filter(c=>c.checked).map(c=>c.value).join(",");
-    [exportIdsInput,deleteIdsInput,shareIdsInput].forEach(el=>el.value=ids);
-    const active=ids.length>0;
-    [exportBtn,deleteBtn,shareBtn].forEach(btn=>{btn.disabled=!active;btn.classList.toggle("opacity-50",!active);btn.classList.toggle("cursor-not-allowed",!active);});
-    exportBar.classList.toggle("translate-y-full",!active);
-    exportBar.classList.toggle("opacity-0",!active);
+    const ids=[];
+    const checks=rowChecks();
+    for(const c of checks)if(c.checked)ids.push(c.value);
+    const joined=ids.join(",");
+    [exportIdsInput,deleteIdsInput,shareIdsInput].forEach(el=>{if(el)el.value=joined;});
+    const active=joined.length>0;
+    [exportBtn,deleteBtn,shareBtn].forEach(btn=>{if(!btn)return;btn.disabled=!active;btn.classList.toggle("opacity-50",!active);btn.classList.toggle("cursor-not-allowed",!active);});
+    exportBar?.classList.toggle("translate-y-full",!active);
+    exportBar?.classList.toggle("opacity-0",!active);
   }
 
-  function clearSelection(){
-    if(selectAll)selectAll.checked=false;
-    if(selectAllMobile)selectAllMobile.checked=false;
-    rowCheckboxes().forEach(c=>c.checked=false);
+  function syncSelectAllFromRows(){
+    const checks=rowChecks();
+    const total=checks.length;
+    let selected=0;
+    for(const c of checks)if(c.checked)selected++;
+    const all=total>0&&selected===total;
+    const none=selected===0;
+    [selectAll,selectAllMobile].forEach(el=>{if(!el)return;el.indeterminate=!none&&!all;el.checked=all;});
+  }
+
+  function applyToRows(checked){
+    rowChecks().forEach(cb=>cb.checked=checked);
+    updateExportState();
+    syncSelectAllFromRows();
+  }
+
+  refreshCodes();
+  animateProgress();
+
+  if(selectAllMobile)selectAllMobile.addEventListener("change",()=>{if(!isMyTabActive())return;if(selectAll){selectAll.checked=selectAllMobile.checked;selectAll.indeterminate=false;}applyToRows(selectAllMobile.checked);});
+  if(selectAll)selectAll.addEventListener("change",()=>{if(!isMyTabActive())return;if(selectAllMobile){selectAllMobile.checked=selectAll.checked;selectAllMobile.indeterminate=false;}applyToRows(selectAll.checked);});
+
+  document.addEventListener("change",e=>{
+    if(e.target.closest(".row-check")){updateExportState();syncSelectAllFromRows();}
+  });
+
+  if(exportCancel)exportCancel.addEventListener("click",()=>{
+    [selectAll,selectAllMobile].forEach(el=>{if(el){el.checked=false;el.indeterminate=false;}});
+    rowChecks().forEach(c=>c.checked=false);
+    updateExportState();
+  });
+
+  function normalize(s){return (s||"").toLowerCase();}
+  function filterTableRows(input,table,rowSelector,fields){
+    const filter=normalize(input.value);
+    table.querySelectorAll(rowSelector).forEach(row=>{
+      let text="";
+      for(const sel of fields){const el=row.querySelector(sel);if(el)text+=" "+el.textContent;}
+      row.style.display=normalize(text).includes(filter)?"":"none";
+    });
+    syncSelectAllFromRows();
     updateExportState();
   }
+  function debounce(fn,ms){let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms);};}
 
-  if(selectAll){
-    selectAll.addEventListener("change",()=>{if(!isMyTabActive())return;rowCheckboxes().forEach(c=>c.checked=selectAll.checked);if(selectAllMobile)selectAllMobile.checked=selectAll.checked;updateExportState();});
-  }
-  if(selectAllMobile){
-    selectAllMobile.addEventListener("change",()=>{if(!isMyTabActive())return;if(selectAll)selectAll.checked=selectAllMobile.checked;rowCheckboxes().forEach(c=>c.checked=selectAllMobile.checked);updateExportState();});
-  }
-  rowCheckboxes().forEach(c=>c.addEventListener("change",updateExportState));
-  if(exportCancel)exportCancel.addEventListener("click",clearSelection);
+  if(mySearch)mySearch.addEventListener("input",debounce(()=>{filterTableRows(mySearch,totpTable,"tbody > tr",['[data-field="account"]','[data-field="issuer"]',".totp-code"]);},150));
+  if(sharedSearch)sharedSearch.addEventListener("input",debounce(()=>{filterTableRows(sharedSearch,sharedTable,"tbody > tr",['[data-field="account"]','[data-field="issuer"]','[data-field="owner"]',".totp-code"]);},150));
 
   const tabs={"my-codes-tab":"my-codes","shared-with-me-tab":"shared-with-me"};
   for(const [tabId,contentId] of Object.entries(tabs)){
     $(`#${tabId}`).addEventListener("click",()=>{
-      Object.entries(tabs).forEach(([tid,cid])=>{$(`#${tid}`).classList.toggle("text-primary",tid===tabId);$(`#${tid}`).classList.toggle("text-gray-500",tid!==tabId);$(`#${tid}`).classList.toggle("border-primary",tid===tabId);$(`#${tid}`).classList.toggle("border-transparent",tid!==tabId);$(`#${cid}`).classList.toggle("hidden",cid!==contentId);});
+      for(const [tid,cid] of Object.entries(tabs)){
+        $(`#${tid}`).classList.toggle("text-primary",tid===tabId);
+        $(`#${tid}`).classList.toggle("text-gray-500",tid!==tabId);
+        $(`#${tid}`).classList.toggle("border-primary",tid===tabId);
+        $(`#${tid}`).classList.toggle("border-transparent",tid!==tabId);
+        $(`#${cid}`).classList.toggle("hidden",cid!==contentId);
+      }
       toggleMobileSelectVisible(contentId==="my-codes");
-      clearSelection();
+      [selectAll,selectAllMobile].forEach(el=>{if(el){el.checked=false;el.indeterminate=false;}});
+      rowChecks().forEach(c=>c.checked=false);
+      updateExportState();
     });
   }
   toggleMobileSelectVisible(isMyTabActive());
 
-  const exportForm=$("#export-selected-form");
   if(exportBtn&&exportForm){
     exportBtn.addEventListener("click",async()=>{
       const res=await fetch(exportForm.action,{method:exportForm.method,body:new FormData(exportForm),credentials:"same-origin"});
@@ -180,39 +233,30 @@ document.addEventListener("DOMContentLoaded",()=>{
     });
   }
 
-  const importModal=$("#import-modal");
-  const fileInput=$("#import-file");
-  const textInput=$("#import-text");
-  const importBtn=$("#import-btn");
-  const importCancel=$("#import-cancel");
-
-  if(importBtn)importBtn.addEventListener("click",()=>{show(importModal);textInput.value="";fileInput.value=null;textInput.focus();});
-  if(importCancel)importCancel.addEventListener("click",()=>hide(importModal));
-
-  if(fileInput)fileInput.addEventListener("change",e=>{
-    const file=e.target.files[0];
+  function handleImageFile(file){
     if(!file||!file.type.startsWith("image/")||file.size>MAX_SIZE){alert("Invalid image (max 5MB)");return;}
     const img=new Image();
     img.onload=()=>{parseMigrationQRCode(img,textInput);URL.revokeObjectURL(img.src);};
     img.src=URL.createObjectURL(file);
-  });
+  }
 
+  if(importBtn)importBtn.addEventListener("click",()=>{show(importModal);textInput.value="";if(fileInput)fileInput.value=null;textInput.focus();});
+  if(importCancel)importCancel.addEventListener("click",()=>hide(importModal));
+  if(fileInput)fileInput.addEventListener("change",e=>handleImageFile(e.target.files[0]));
   window.addEventListener("paste",e=>{
     if(!importModal||importModal.classList.contains("hidden"))return;
-    [...e.clipboardData.items].forEach(item=>{
+    for(const item of e.clipboardData.items){
       if(item.type.startsWith("image/")){
         const blob=item.getAsFile();
         if(blob.size>MAX_SIZE){alert("Image too large");return;}
-        const img=new Image();
-        img.onload=()=>{parseMigrationQRCode(img,textInput);URL.revokeObjectURL(img.src);};
-        img.src=URL.createObjectURL(blob);
+        handleImageFile(blob);
         e.preventDefault();
       }
-    });
+    }
   });
 
   if(shareBtn)shareBtn.addEventListener("click",()=>{
-    const ids=shareIdsInput.value;
+    const ids=shareIdsInput?.value||"";
     if(!ids){alert("Select at least one TOTP to share");return;}
     const modal=$("#share-modal");
     show(modal);
@@ -223,4 +267,102 @@ document.addEventListener("DOMContentLoaded",()=>{
 
   $("#share-cancel")?.addEventListener("click",()=>hide($("#share-modal")));
   $("#shared-users-cancel")?.addEventListener("click",()=>hide($("#shared-users-modal")));
+
+  document.addEventListener("click",e=>{
+    const btn=e.target.closest(".shared-btn[data-shared-id]");
+    if(btn){const id=btn.getAttribute("data-shared-id");if(id)showSharedUsers(id);}
+  });
+
+  document.addEventListener("click",e=>{
+    const editBtn=e.target.closest(".edit-totp");
+    if(!editBtn)return;
+    const row=editBtn.closest("tr");
+    const accountEl=row.querySelector('[data-editable-account]');
+    const controls=row.querySelector(".totp-controls");
+    const saveControl=controls.querySelector(".save-totp");
+    const cancelControl=controls.querySelector(".cancel-edit");
+    const accVal=accountEl.textContent.trim();
+    const rect=accountEl.getBoundingClientRect();
+    accountEl.style.position="relative";
+    accountEl.style.minHeight=`${Math.ceil(rect.height)}px`;
+    accountEl.classList.add("rounded");
+    accountEl.innerHTML=`<span class="block truncate pointer-events-none">${accVal}</span><input type="text" class="absolute inset-0 w-full h-full text-sm bg-warning-100 border border-gray-300 outline-none focus:ring-0 px-1" value="${accVal}" data-input-account />`;
+    controls.querySelector(".edit-totp").classList.add("hidden");
+    saveControl.classList.remove("hidden");
+    cancelControl.classList.remove("hidden");
+    const input=accountEl.querySelector("[data-input-account]");
+    if(input){input.focus();input.select();}
+  });
+
+  document.addEventListener("click",e=>{
+    const saveBtn=e.target.closest(".save-totp");
+    if(!saveBtn)return;
+    const row=saveBtn.closest("tr");
+    const totpId=saveBtn.getAttribute("data-id");
+    const accountEl=row.querySelector('[data-editable-account]');
+    const controls=row.querySelector(".totp-controls");
+    const editControl=controls.querySelector(".edit-totp");
+    const cancelControl=controls.querySelector(".cancel-edit");
+    const input=accountEl.querySelector("[data-input-account]");
+    const newAccount=input?input.value.trim():accountEl.textContent.trim();
+    if(!newAccount){alert("Account is required");return;}
+    const fd=new FormData();
+    fd.append("totp_id",totpId);
+    fd.append("account",newAccount);
+    fetch("/totp/update",{method:"POST",body:fd,credentials:"same-origin"})
+      .then(r=>r.json().then(j=>({ok:r.ok,body:j})))
+      .then(({ok,body})=>{
+        if(!ok){showFlash(body.flash?.message||"Update failed",body.flash?.category||"error");throw new Error(body.flash?.message||"Update failed");}
+        accountEl.textContent=newAccount;
+        accountEl.classList.remove("rounded");
+        accountEl.style.position="";
+        accountEl.style.minHeight="";
+        saveBtn.classList.add("hidden");
+        cancelControl.classList.add("hidden");
+        editControl.classList.remove("hidden");
+        if(body.flash)showFlash(body.flash.message,body.flash.category);
+      })
+      .catch(err=>{console.error(err);});
+  });
+
+  document.addEventListener("click",e=>{
+    const cancelBtn=e.target.closest(".cancel-edit");
+    if(!cancelBtn)return;
+    const row=cancelBtn.closest("tr");
+    const accountEl=row.querySelector('[data-editable-account]');
+    const controls=row.querySelector(".totp-controls");
+    const editControl=controls.querySelector(".edit-totp");
+    const saveControl=controls.querySelector(".save-totp");
+    const input=accountEl.querySelector("[data-input-account]");
+    const original=input?input.defaultValue:accountEl.textContent;
+    accountEl.textContent=original;
+    accountEl.classList.remove("rounded");
+    accountEl.style.position="";
+    accountEl.style.minHeight="";
+    saveControl.classList.add("hidden");
+    cancelBtn.classList.add("hidden");
+    editControl.classList.remove("hidden");
+  });
+
+  let lastSaveTime=0;
+  const SAVE_DEBOUNCE=2000;
+  document.addEventListener("keydown",e=>{
+    const input=e.target.closest("[data-input-account]");
+    if(!input)return;
+    if(e.key==="Enter"){
+      e.preventDefault();
+      const now=Date.now();
+      if(now-lastSaveTime<SAVE_DEBOUNCE){showFlash("Not so fast!","warning");return;}
+      lastSaveTime=now;
+      const row=input.closest("tr");
+      const saveBtn=row.querySelector(".save-totp");
+      if(saveBtn)saveBtn.click();
+    }
+    if(e.key==="Escape"){
+      e.preventDefault();
+      const row=input.closest("tr");
+      const cancelBtn=row.querySelector(".cancel-edit");
+      if(cancelBtn)cancelBtn.click();
+    }
+  });
 });

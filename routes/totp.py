@@ -158,3 +158,13 @@ async def unshare_totp(totp_id: int = Form(...), email: str = Form(...), user=De
     if not success:
         return JSONResponse({"message": message, "category": "error"}, status_code=400)
     return JSONResponse({"message": message, "category": "success"})
+
+@router.post("/update", response_class=JSONResponse)
+async def update_totp(totp_id: int = Form(...), account: str = Form(...), user=Depends(get_authenticated_user)):
+    account = account.strip()
+    if not account:
+        return JSONResponse( {"flash": {"message": "Account is required.", "category": "error"}}, status_code=400)
+    success, message = await TotpService.update(totp_id, account, user)
+    if not success:
+        return JSONResponse({"flash": {"message": message, "category": "error"}}, status_code=400)
+    return JSONResponse({"flash": {"message": message, "category": "success"}}, status_code=200)
