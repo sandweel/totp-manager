@@ -26,17 +26,13 @@ Built with **FastAPI**, **SQLAlchemy (async)**, **MySQL/MariaDB**, **Fernet encr
   - View who has access to each shared TOTP
   - Revoke access at any time
 
-- 📧 **Email Integration**
-  - Email notifications and templates (via **Mailgun API**)
-  - Used for registration confirmation and password resets
-
 ---
 ### ⚙️ Setup and Run (Local)
 
 ### 1. Clone the repository
 ```sh
-git clone https://github.com/<your-username>/<repo>.git
-cd <repo>
+git clone https://github.com/sandweel/totp-manager.git
+cd totp-manager
 ```
 ### 2. Backend: create virtual environment & install dependencies
 Backend: create virtual environment & install dependencies
