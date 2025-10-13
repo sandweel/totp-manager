@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - TOTP Manager{% endblock %}
+
+{% block content %}
+<script src="{{ url_for('static', path='js/password-validator.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  initPasswordStrengthMeter();
+  
+  const tabs = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  function switchTab(targetTab) {
+    tabs.forEach(t => {
+      t.classList.remove('bg-primary', 'text-primary-text');
+      t.classList.add('text-gray-600', 'hover:bg-gray-100');
+    });
+    
+    tabContents.forEach(content => content.classList.add('hidden'));
+    
+    const targetTabButtons = document.querySelectorAll(`[data-tab="${targetTab}"]`);
+    targetTabButtons.forEach(button => {
+      button.classList.remove('text-gray-600', 'hover:bg-gray-100');
+      button.classList.add('bg-primary', 'text-primary-text');
+    });
+    
+    const targetContent = document.getElementById(targetTab);
+    if (targetContent) {
+      targetContent.classList.remove('hidden');
+    }
+    
+    const url = new URL(window.location);
+    url.searchParams.set('tab', targetTab);
+    window.history.replaceState({}, '', url);
+  }
+  
+  const urlParams = new URLSearchParams(window.location.search);
+  const activeTab = urlParams.get('tab') || 'security';
+  
+  switchTab(activeTab);
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      const targetTab = this.getAttribute('data-tab');
+      switchTab(targetTab);
+    });
+  });
+});
+</script>
+
+<div class="min-h-screen bg-white shadow-xl rounded-xl sm:p-6 mx-auto">
+  <div class="flex">
+    <!-- Sidebar -->
+    <div class="hidden md:block w-64 bg-white border-r border-gray-200 min-h-screen">
+      <div class="p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Profile Settings</h2>
+            <nav class="space-y-2">
+              <button class="tab-button w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition text-gray-600 hover:bg-gray-100" data-tab="security">
+                <span class="mr-3">🛡️</span>
+                Security
+              </button>
+              <button class="tab-button w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition text-gray-600 hover:bg-gray-100" data-tab="sessions">
+                <span class="mr-3">🖥️</span>
+                Sessions
+              </button>
+            </nav>
+      </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="flex-1 p-4 md:p-8">
+      <div class="max-w-6xl mx-auto">
+        <!-- Mobile Navigation -->
+        <div class="md:hidden mb-6">
+          <div class="bg-white rounded-xl shadow-lg p-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Profile Settings</h2>
+            <nav class="flex space-x-4">
+              <button class="tab-button flex items-center px-3 py-2 text-sm font-medium rounded-lg transition text-gray-600 hover:bg-gray-100" data-tab="security">
+                <span class="mr-2">🛡️</span>
+                Security
+              </button>
+              <button class="tab-button flex items-center px-3 py-2 text-sm font-medium rounded-lg transition text-gray-600 hover:bg-gray-100" data-tab="sessions">
+                <span class="mr-2">🖥️</span>
+                Sessions
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        <!-- Security Tab Content -->
+        <div id="security" class="tab-content">
+          <h1 class="text-2xl font-bold text-gray-800 mb-8">Security Settings</h1>
+          
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Account Information</h2>
+            <div class="space-y-4">
+              <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <input type="email" 
+                       id="email" 
+                       value="{{ user.email }}" 
+                       disabled
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-500 cursor-not-allowed">
+              </div>
+            </div>
+          </div>
+
+          <div class="border-t-2 border-gray-200 pt-8">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Change Password</h2>
+            <form method="POST" action="/auth/profile/change-password" class="space-y-4 max-w-md">
+              <div>
+                <label for="current_password" class="block text-sm font-medium text-gray-700 mb-1">
+                  Current Password
+                </label>
+                <input type="password" 
+                       id="current_password" 
+                       name="current_password" 
+                       required
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+              </div>
+              
+              <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
+                  New Password
+                </label>
+                <input type="password" 
+                       id="password" 
+                       name="new_password" 
+                       required
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+
+                <div class="h-2 rounded mt-2 mb-1 overflow-hidden bg-gray-200">
+                  <div id="password-strength-bar" class="h-full bg-danger transition-all duration-300" style="width: 0%;"></div>
+                </div>
+
+                <div class="text-sm text-gray-600 bg-gray-100 border border-gray-300 rounded-lg p-3 mt-2">
+                  <p class="font-medium mb-1"><strong>Your password must include:</strong></p>
+                  <ul id="password-rules" class="list-disc list-inside space-y-1">
+                    <li id="rule-length">At least <strong>10 characters</strong></li>
+                    <li id="rule-digit">At least <strong>1 digit</strong></li>
+                    <li id="rule-upper">At least <strong>1 uppercase letter</strong></li>
+                    <li id="rule-lower">At least <strong>1 lowercase letter</strong></li>
+                    <li id="rule-special">At least <strong>1 special character</strong></li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div>
+                <label for="confirm_password" class="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm New Password
+                </label>
+                <input type="password" 
+                       id="confirm_password" 
+                       name="confirm_password" 
+                       required
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
+              </div>
+              
+              <button type="submit" 
+                      class="bg-primary hover:bg-primary-hover text-primary-text px-5 py-2 rounded-md transition">
+                Change Password
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Sessions Tab Content -->
+        <div id="sessions" class="tab-content hidden">
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h1 class="text-2xl font-semibold text-primary">Sessions</h1>
+            <form action="/auth/sessions/revoke-all" method="post">
+              <button class="px-4 py-2 bg-red-600 text-white rounded w-full sm:w-auto hover:bg-red-700 transition-colors duration-200">Revoke all</button>
+            </form>
+          </div>
+
+          <!-- Desktop Table -->
+          <div class="hidden md:block overflow-x-auto bg-white rounded shadow">
+            <table class="min-w-full">
+              <thead>
+                <tr class="text-left text-sm text-gray-600">
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3">IP</th>
+                  <th class="px-4 py-3">User Agent</th>
+                  <th class="px-4 py-3">Last Used</th>
+                  <th class="px-4 py-3 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm">
+                {% for s in sessions %}
+                {% set is_active = (s.revoked_at is none) and (s.replaced_by_session_id is none) and (s.refresh_token_expires_at > now) %}
+                {% if is_active %}
+                {% set is_current = (current_sid is not none) and (s.session_id == current_sid) %}
+                <tr class="border-t">
+                  <td class="px-4 py-3">
+                    {% if is_current %}
+                      <span class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Current</span>
+                    {% endif %}
+                    <span class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-xs ml-1">Active</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="text-sm">{{ s.ip or "—" }}</div>
+                    {% for session_data in sessions_with_location %}
+                      {% if session_data.session.session_id == s.session_id %}
+                        <div class="text-xs text-gray-500 flex items-center gap-1">
+                          <span class="text-sm">{{ session_data.flag }}</span>
+                          <span>{{ session_data.location }}</span>
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  </td>
+                  <td class="px-4 py-3" title="{{ s.user_agent or '' }}">{{ s.user_agent | ua_pretty }}</td>
+                  <td class="px-4 py-3">{{ s.last_used_at.strftime("%Y-%m-%d %H:%M:%S") if s.last_used_at else "—" }}</td>
+                  <td class="px-4 py-3 text-center">
+                    {% if not is_current %}
+                    <form action="/auth/sessions/{{ s.session_id }}/revoke" method="post" class="inline-block">
+                      <button class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 hover:text-red-800 transition-colors duration-200">Revoke</button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile Cards -->
+          <div class="space-y-4 md:hidden">
+            {% for s in sessions %}
+            {% set is_active = (s.revoked_at is none) and (s.replaced_by_session_id is none) and (s.refresh_token_expires_at > now) %}
+            {% if is_active %}
+            {% set is_current = (current_sid is not none) and (s.session_id == current_sid) %}
+            <div class="bg-white shadow rounded p-4 text-sm">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  {% if is_current %}
+                    <span class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Current</span>
+                  {% endif %}
+                  <span class="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded text-xs ml-1">Active</span>
+                </div>
+                {% if not is_current %}
+                <form action="/auth/sessions/{{ s.session_id }}/revoke" method="post">
+                  <button class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 hover:text-red-800 transition-colors duration-200">Revoke</button>
+                </form>
+                {% endif %}
+              </div>
+              <div class="space-y-1 text-gray-700">
+                <div><span class="font-medium">IP:</span> {{ s.ip or "—" }}</div>
+                {% for session_data in sessions_with_location %}
+                  {% if session_data.session.session_id == s.session_id %}
+                    <div class="flex items-center gap-1">
+                      <span class="font-medium mr-2">Location:</span>
+                      <span class="text-sm">{{ session_data.flag }}</span>
+                      <span>{{ session_data.location }}</span>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+                <div><span class="font-medium">User Agent:</span> {{ s.user_agent | ua_pretty }}</div>
+                <div><span class="font-medium">Last Used:</span> {{ s.last_used_at.strftime("%Y-%m-%d %H:%M:%S") if s.last_used_at else "—" }}</div>
+              </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

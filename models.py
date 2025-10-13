@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Index, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from config import Base
@@ -25,7 +25,7 @@ class TOTPItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     issuer = Column(String(128), nullable=False)
     account = Column(String(128), nullable=False)
-    encrypted_secret = Column(String(256), nullable=False)
+    encrypted_secret = Column(Text, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     user = relationship("User", back_populates="totp_items")
@@ -37,7 +37,7 @@ class SharedTOTP(Base):
     id = Column(Integer, primary_key=True, index=True)
     totp_item_id = Column(Integer, ForeignKey("totp_items.id"), nullable=False)
     shared_with_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    encrypted_secret = Column(String(256), nullable=False)
+    encrypted_secret = Column(Text, nullable=False)
 
     totp_item = relationship("TOTPItem", back_populates="shared_with")
     shared_with_user = relationship("User", back_populates="shared_totp_items")

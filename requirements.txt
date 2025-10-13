@@ -18,3 +18,4 @@ sqlalchemy[asyncio]
 starlette
 user-agents
 uvicorn[standard]
+geoip2

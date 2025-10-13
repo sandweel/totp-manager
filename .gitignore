@@ -1,3 +1,4 @@
+data/GeoLite2-City.mmdb
 static/css/style.css
 logs/*
 !logs/.gitkeep

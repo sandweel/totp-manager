@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
         return;
       }
-      const base32Regex = /^[A-Z2-7]{16,64}={0,6}$/i;
+      const base32Regex = /^[A-Z2-7]{16,}={0,6}$/i;
       if (!base32Regex.test(secret)) {
         showFlash("Secret must be a valid Base32 string.", "error");
         e.preventDefault();

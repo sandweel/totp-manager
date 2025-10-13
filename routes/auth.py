@@ -1,27 +1,19 @@
 from fastapi import APIRouter, Request, Form, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
-from cryptography.fernet import Fernet
-from jose import jwt
-from jose.exceptions import JWTError
-from datetime import datetime, timedelta
-from sqlalchemy import select, update
 from typing import Optional
-import uuid
 
-from config import settings, async_session, templates, master_fernet, http_client
+from config import templates
 from models import User, Session as SessionDB
 from services.flash import flash, get_flashed_message
-from services.validator import validate_password, validate_email
 from services.auth import (
-    now_utc,
-    create_access_token,
-    persist_new_session,
     set_auth_cookies,
     clear_auth_cookies,
     get_current_user_if_exists,
-    hash_password,
-    verify_password,
+    get_authenticated_user,
+    now_utc,
 )
+from services.auth_service import AuthService
+from services.session_service import SessionService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -37,80 +29,31 @@ async def post_register(request: Request, email: str = Form(...), password: str 
                         user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
-    email_msg = validate_email(email)
-    if email_msg:
-        flash(request, email_msg, "error")
+    
+    # Use AuthService for registration
+    success, user_email, error_msg = await AuthService.register_user(email, password, confirm_password)
+    
+    if not success:
+        flash(request, error_msg, "error")
         flash_data = get_flashed_message(request)
         return templates.TemplateResponse(
             "auth/register.html",
             {"request": request, "flash": flash_data, "email": email},
             status_code=status.HTTP_303_SEE_OTHER
         )
-
-    if password != confirm_password:
-        flash(request, "Passwords do not match", "error")
-        flash_data = get_flashed_message(request)
-        return templates.TemplateResponse("auth/register.html",
-                                          {"request": request, "flash": flash_data, "email": email},
-                                          status_code=status.HTTP_303_SEE_OTHER)
-    error_msg = validate_password(password)
-    if error_msg:
-        flash(request, error_msg, "error")
-        flash_data = get_flashed_message(request)
-        return templates.TemplateResponse("auth/register.html",
-                                          {"request": request, "flash": flash_data, "email": email},
-                                          status_code=status.HTTP_303_SEE_OTHER)
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        if result.scalars().first():
-            flash(request, "Email already registered", "error")
-            return RedirectResponse(url="/auth/register", status_code=status.HTTP_303_SEE_OTHER)
-        hashed_password = hash_password(password)
-        user_dek = Fernet.generate_key()
-        encrypted_dek = master_fernet.encrypt(user_dek).decode()
-        user = User(email=email, hashed_password=hashed_password, encrypted_dek=encrypted_dek)
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
-    confirm_token = create_access_token({"sub": str(user.id)}, expires_delta=timedelta(hours=24))
-    link = f"{settings.FRONTEND_URL}/auth/confirm?token={confirm_token}"
-    try:
-        html_content = templates.get_template("email/confirmation_email.html").render(link=link, year=datetime.now().year)
-        await http_client.post(
-            f"https://api.mailgun.net/v3/{settings.MAILGUN_DOMAIN}/messages",
-            auth=("api", settings.MAILGUN_API_KEY),
-            data={"from": f"no-reply@{settings.MAILGUN_DOMAIN}", "to": [email], "subject": "Confirm your account",
-                  "html": html_content}
-        )
-        flash(request, "Confirmation email sent. Please check your email", "success")
-    except Exception:
-        flash(request, "Failed to send confirmation email. Please try again.", "error")
+    
+    flash(request, "Confirmation email sent. Please check your email", "success")
     return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/confirm")
 async def confirm_email(request: Request, token: str):
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id = payload.get("sub")
-    except JWTError:
-        flash(request, "Invalid or expired token", "error")
-        return RedirectResponse(url="/auth/login", status_code=302)
-    if user_id is None:
-        flash(request, "Invalid token: User ID missing", "error")
-        return RedirectResponse(url="/auth/login", status_code=302)
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.id == int(user_id)))
-        user = result.scalars().first()
-        if not user:
-            flash(request, "User not found", "error")
-            return RedirectResponse(url="/auth/login", status_code=302)
-        if user.is_verified:
-            flash(request, "Email already confirmed", "info")
-            return RedirectResponse(url="/auth/login", status_code=302)
-        user.is_verified = True
-        db.add(user)
-        await db.commit()
-    flash(request, "Email successfully confirmed!", "success")
+    success, error_msg = await AuthService.confirm_email(token)
+    
+    if not success:
+        flash(request, error_msg, "error")
+    else:
+        flash(request, "Email successfully confirmed!", "success")
+    
     return RedirectResponse(url="/auth/login", status_code=302)
 
 @router.get("/login", response_class=HTMLResponse)
@@ -125,38 +68,25 @@ async def post_login(request: Request, email: str = Form(...), password: str = F
                      user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalars().first()
-    if not user or not verify_password(password, user.hashed_password) or not user.is_verified:
-        flash(request, "Invalid credentials or unverified email.", "error")
+    
+    # Use AuthService for login
+    success, access_token, refresh_token, error_msg = await AuthService.login_user(email, password, request)
+    
+    if not success:
+        flash(request, error_msg, "error")
         return templates.TemplateResponse(
             "auth/login.html",
             {"request": request, "email": email, "flash": get_flashed_message(request)},
             status_code=status.HTTP_303_SEE_OTHER
         )
-    access, refresh, _sid = await persist_new_session(user, request)
+    
     redirect_response = RedirectResponse(url="/totp/list", status_code=status.HTTP_302_FOUND)
-    set_auth_cookies(redirect_response, access, refresh)
+    set_auth_cookies(redirect_response, access_token, refresh_token)
     return redirect_response
 
 @router.get("/logout")
 async def logout(request: Request):
-    refresh_token = request.cookies.get("refresh_token")
-    if refresh_token:
-        try:
-            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            if payload.get("type") == "refresh":
-                sid = payload.get("sid")
-                async with async_session() as db:
-                    await db.execute(
-                        update(SessionDB)
-                        .where(SessionDB.session_id == sid)
-                        .values(revoked_at=now_utc())
-                    )
-                    await db.commit()
-        except JWTError:
-            pass
+    await AuthService.logout_user(request)
     response = RedirectResponse(url="/auth/login", status_code=status.HTTP_302_FOUND)
     clear_auth_cookies(response)
     return response
@@ -173,34 +103,14 @@ async def send_reset_email(request: Request, email: str = Form(...),
                            user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
         return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.email == email))
-        user = result.scalars().first()
-        if user:
-            now = now_utc()
-            if user.password_reset_requested_at and now - user.password_reset_requested_at < timedelta(minutes=1):
-                flash(request, "You have recently requested a password reset. Please wait a minute before trying again.", "error")
-                return RedirectResponse(url="/auth/reset-password", status_code=status.HTTP_303_SEE_OTHER)
-            reset_token_id = str(uuid.uuid4())
-            user.password_reset_token_id = reset_token_id
-            user.password_reset_requested_at = now
-            db.add(user)
-            await db.commit()
-            token = create_access_token({"sub": str(user.id), "reset_id": reset_token_id}, expires_delta=timedelta(hours=1))
-            link = f"{settings.FRONTEND_URL}/auth/reset-password/confirm?token={token}"
-            try:
-                html_content = templates.get_template("email/reset_password_email.html").render(link=link, year=datetime.now().year)
-                await http_client.post(
-                    f"https://api.mailgun.net/v3/{settings.MAILGUN_DOMAIN}/messages",
-                    auth=("api", settings.MAILGUN_API_KEY),
-                    data={"from": f"no-reply@{settings.MAILGUN_DOMAIN}", "to": [email], "subject": "Reset your password",
-                          "html": html_content}
-                )
-                flash(request, "If email exists, reset link sent. Check your inbox.", "success")
-            except Exception:
-                flash(request, "Failed to send reset email. Please try again.", "error")
-        else:
-            flash(request, "If email exists, reset link sent. Check your inbox.", "success")
+    
+    success, error_msg = await AuthService.request_password_reset(email)
+    
+    if not success:
+        flash(request, error_msg, "error")
+        return RedirectResponse(url="/auth/reset-password", status_code=status.HTTP_303_SEE_OTHER)
+    
+    flash(request, "If email exists, reset link sent. Check your inbox.", "success")
     return RedirectResponse(url="/auth/reset-password", status_code=status.HTTP_303_SEE_OTHER)
 
 @router.get("/reset-password/confirm", response_class=HTMLResponse)
@@ -216,43 +126,50 @@ async def reset_password(request: Request, token: str = Form(...), password: str
                          confirm_password: str = Form(...),
                          user: Optional[User] = Depends(get_current_user_if_exists)):
     if user:
-        return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEЕ_OTHER)
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id = payload.get("sub")
-        reset_id_from_token = payload.get("reset_id")
-        if not reset_id_from_token:
-            flash(request, "Invalid token: missing reset ID", "error")
-            return RedirectResponse(url="/auth/reset-password", status_code=302)
-    except JWTError:
-        flash(request, "Invalid or expired token", "error")
-        return RedirectResponse(url="/auth/reset-password", status_code=302)
-    if user_id is None:
-        flash(request, "Invalid token: User ID missing", "error")
-        return RedirectResponse(url="/auth/reset-password", status_code=302)
-    async with async_session() as db:
-        result = await db.execute(select(User).where(User.id == int(user_id)))
-        user = result.scalars().first()
-        if not user:
-            flash(request, "User not found", "error")
-            return RedirectResponse(url="/auth/reset-password", status_code=302)
-        if not user.password_reset_token_id or user.password_reset_token_id != reset_id_from_token:
-            flash(request, "Invalid or expired reset link. Please try again.", "error")
-            return RedirectResponse(url="/auth/reset-password", status_code=302)
-        if password != confirm_password:
-            flash(request, "Passwords do not match", "error")
-            flash_data = get_flashed_message(request)
-            return templates.TemplateResponse("auth/reset_password.html", {"request": request, "flash": flash_data, "token": token})
-        error_msg = validate_password(password)
-        if error_msg:
-            flash(request, error_msg, "error")
-            flash_data = get_flashed_message(request)
-            return templates.TemplateResponse("auth/reset_password.html", {"request": request, "flash": flash_data, "token": token})
-        user.hashed_password = hash_password(password)
-        user.password_reset_token_id = None
-        user.password_reset_requested_at = None
-        user.is_verified = True
-        db.add(user)
-        await db.commit()
+        return RedirectResponse(url="/totp/list", status_code=status.HTTP_303_SEE_OTHER)
+    
+    success, error_msg = await AuthService.reset_password(token, password, confirm_password)
+    
+    if not success:
+        flash(request, error_msg, "error")
+        flash_data = get_flashed_message(request)
+        return templates.TemplateResponse("auth/reset_password.html", {"request": request, "flash": flash_data, "token": token})
+    
     flash(request, "Password reset successfully. You can now log in.", "success")
     return RedirectResponse(url="/auth/login", status_code=302)
+
+@router.get("/profile", response_class=HTMLResponse)
+async def get_profile(request: Request, user: User = Depends(get_authenticated_user)):
+    flash_data = get_flashed_message(request)
+    
+    # Get user sessions with location info
+    sessions_with_location = await SessionService.get_user_sessions(user)
+    sessions = [item['session'] for item in sessions_with_location]
+    
+    current_sid = getattr(request.state, 'current_sid', None)
+    
+    return templates.TemplateResponse("auth/profile.html", {
+        "request": request, 
+        "flash": flash_data, 
+        "user": user,
+        "sessions": sessions,
+        "sessions_with_location": sessions_with_location,
+        "current_sid": current_sid,
+        "now": now_utc()
+    })
+
+@router.post("/profile/change-password")
+async def change_password(request: Request, 
+                        current_password: str = Form(...),
+                        new_password: str = Form(...),
+                        confirm_password: str = Form(...),
+                        user: User = Depends(get_authenticated_user)):
+    
+    success, error_msg = await AuthService.change_password(user, current_password, new_password, confirm_password)
+    
+    if not success:
+        flash(request, error_msg, "error")
+    else:
+        flash(request, "Password changed successfully", "success")
+    
+    return RedirectResponse(url="/auth/profile", status_code=status.HTTP_303_SEE_OTHER)

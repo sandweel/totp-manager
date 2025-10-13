@@ -81,7 +81,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request):
+async def global_exception_handler(request: Request, exc: Exception):
     logging.exception(f"Unhandled error for request: {request.url}")
     return templates.TemplateResponse(
         "errors/500.html",

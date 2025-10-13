@@ -7,7 +7,8 @@ from services.flash import flash, get_flashed_message
 from services.totp_service import TotpService
 from services.auth import get_authenticated_user
 from services.validator import validate_totp
-from services.import_export import build_migration_uri, build_qr_png, decode_migration_uri
+from services.import_export import build_qr_png
+from services.import_export_service import ImportExportService
 
 router = APIRouter(prefix="/totp", tags=["totp"])
 
@@ -106,26 +107,12 @@ async def export_qr(request: Request, ids: str = Form(...), user=Depends(get_aut
 
 @router.post("/import", response_class=RedirectResponse)
 async def import_totps(request: Request, uri: str = Form(...), user=Depends(get_authenticated_user)):
-    try:
-        otp_uris = decode_migration_uri(uri.strip())
-        created = 0
-        for otp_uri in otp_uris:
-            from urllib.parse import urlparse, parse_qs, unquote
-            p = urlparse(otp_uri)
-            if p.scheme != "otpauth" or p.hostname.lower() != "totp":
-                raise ValueError("Unsupported URI: " + otp_uri)
-            label = unquote(p.path[1:])
-            issuer_field, account = label.split(":", 1)
-            qs = parse_qs(p.query)
-            secret = qs.get("secret", [None])[0]
-            if not secret:
-                raise ValueError("Secret not found in URI.")
-            issuer_qs = qs.get("issuer", [issuer_field])[0]
-            await TotpService.create(account, issuer_qs, secret, user)
-            created += 1
-        flash(request, f"Imported {created} item(s).", "success")
-    except Exception as e:
-        flash(request, str(e), "error")
+    created_count, error_msg = await ImportExportService.import_totp_uris(uri, user)
+    
+    if error_msg:
+        flash(request, error_msg, "error")
+    else:
+        flash(request, f"Imported {created_count} item(s).", "success")
 
     return RedirectResponse(router.url_path_for("get_list"), status_code=303)
 
