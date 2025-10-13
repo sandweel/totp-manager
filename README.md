@@ -31,7 +31,7 @@ Built with **FastAPI**, **SQLAlchemy (async)**, **MySQL/MariaDB**, **Fernet encr
 
 ### 1. Clone the repository
 ```sh
-git clone git@git.aw3.dev:AbsoluteWeb/totp-manager.git
+git clone https://github.com/sandweel/totp-manager.git
 cd totp-manager
 ```
 ### 2. Backend: create virtual environment & install dependencies
