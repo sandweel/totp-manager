@@ -38,6 +38,21 @@ app.include_router(api_router)
 app.include_router(sessions_router)
 
 @app.middleware("http")
+async def proxy_headers_middleware(request: Request, call_next):
+    proto = request.headers.get("x-forwarded-proto")
+    if proto:
+        request.scope["scheme"] = proto
+
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        real_ip = xff.split(",")[0].strip()
+        client = request.scope.get("client")
+        if client:
+            request.scope["client"] = (real_ip, client[1])
+
+    return await call_next(request)
+
+@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     allowlisted = (
         request.url.path.startswith("/auth")
