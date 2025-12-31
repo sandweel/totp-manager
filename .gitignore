@@ -15,6 +15,7 @@ alembic/versions/__pycache__/
 .venv/
 
 .env
+.env_db
 
 .idea/
 

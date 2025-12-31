@@ -1,0 +1,36 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: totp-manager-db
+    restart: unless-stopped
+    env_file:
+      - .env_db
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: true
+    volumes:
+      - totp_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: totp-manager-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+volumes:
+  totp_db_data:
+
