@@ -91,13 +91,23 @@ COOKIE_SECURE=false
 # Mailgun API credentials (for sending emails)
 MAILGUN_API_KEY=
 MAILGUN_DOMAIN=
+
+### Number of Gunicorn workers. Used only when running the app via Docker Compose.
+GUNICORN_WORKERS=
 ```
 ### 5. Apply initial migration
 ```sh
 alembic revision --autogenerate -m "initial migration"
 alembic upgrade head
 ```
-### 6. Run the service
+### 6. Download the latest MaxMind GeoIP City database (GeoLite2-City.mmdb)
+##### From the official [website](https://dev.maxmind.com/geoip/geoip2/geolite2/) or third-party repositories
+
+```sh
+wget https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb -O data/GeoLite2-City.mmdb
+```
+
+### 7. Run the service
 ```sh
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
