@@ -96,7 +96,7 @@ echo "Database setup complete!"
 echo "Running database migrations..."
 cd /app
 if ! mysql $MYSQL_DATABASE -uroot -p$MYSQL_ROOT_PASSWORD -e "SHOW TABLES LIKE 'alembic_version';" | grep -q "alembic_version"; then
-    mkdir alembic/versions
+    mkdir -p alembic/versions
     alembic revision --autogenerate -m "initial migration"
     alembic upgrade head
 else
