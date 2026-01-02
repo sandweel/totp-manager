@@ -28,9 +28,12 @@ services:
     ports:
       - "${PORT:-8000}:8000"
     volumes:
-      - ./logs:/app/logs
-      - ./data:/app/data
+      - totp_app_logs:/app/logs
+      - totp_app_data:/app/data
+      - totp_app_alembic_versions:/app/alembic/versions
 
 volumes:
   totp_db_data:
-
+  totp_app_logs:
+  totp_app_data:
+  totp_app_alembic_versions:

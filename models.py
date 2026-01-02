@@ -18,6 +18,7 @@ class User(Base):
     totp_items = relationship("TOTPItem", back_populates="user")
     shared_totp_items = relationship("SharedTOTP", back_populates="shared_with_user")
     sessions = relationship("Session", back_populates="user")
+    api_keys = relationship("ApiKey", back_populates="user")
 
 class TOTPItem(Base):
     __tablename__ = "totp_items"
@@ -61,3 +62,18 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
 
 Index("ix_sessions_user_active", Session.user_id, Session.revoked_at)
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    key_hash = Column(String(128), unique=True, index=True, nullable=False)
+    name = Column(String(128), nullable=True)  # Опциональное имя для ключа (например, "Android App")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="api_keys")
+
+Index("ix_api_keys_user_active", ApiKey.user_id, ApiKey.revoked_at)

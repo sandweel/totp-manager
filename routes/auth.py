@@ -14,6 +14,7 @@ from services.auth import (
 )
 from services.auth_service import AuthService
 from services.session_service import SessionService
+from services.api_key_service import ApiKeyService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -146,6 +147,13 @@ async def get_profile(request: Request, user: User = Depends(get_authenticated_u
     sessions_with_location = await SessionService.get_user_sessions(user)
     sessions = [item['session'] for item in sessions_with_location]
     
+    # Get API keys
+    api_keys = await ApiKeyService.list_user_api_keys(user)
+    
+    # Get new API key from session (if exists) for one-time display
+    new_api_key = request.session.pop("new_api_key", None)
+    request.session.pop("new_api_key_name", None)
+    
     current_sid = getattr(request.state, 'current_sid', None)
     
     return templates.TemplateResponse("auth/profile.html", {
@@ -155,6 +163,8 @@ async def get_profile(request: Request, user: User = Depends(get_authenticated_u
         "sessions": sessions,
         "sessions_with_location": sessions_with_location,
         "current_sid": current_sid,
+        "api_keys": api_keys,
+        "new_api_key": new_api_key,  # Will be None after first display
         "now": now_utc()
     })
 
@@ -173,3 +183,40 @@ async def change_password(request: Request,
         flash(request, "Password changed successfully", "success")
     
     return RedirectResponse(url="/auth/profile", status_code=status.HTTP_303_SEE_OTHER)
+
+@router.get("/profile/api-keys", response_class=HTMLResponse)
+async def get_api_keys(request: Request, user: User = Depends(get_authenticated_user)):
+    """API keys management page"""
+    flash_data = get_flashed_message(request)
+    api_keys = await ApiKeyService.list_user_api_keys(user)
+    return templates.TemplateResponse("auth/api_keys.html", {
+        "request": request,
+        "flash": flash_data,
+        "user": user,
+        "api_keys": api_keys
+    })
+
+@router.post("/profile/api-keys/create")
+async def create_api_key(request: Request, name: str = Form(None), user: User = Depends(get_authenticated_user)):
+    """Create new API key"""
+    plain_key, api_key_obj = await ApiKeyService.create_api_key(user, name.strip() if name else None)
+    # Save key in session for one-time display
+    request.session["new_api_key"] = plain_key
+    request.session["new_api_key_name"] = api_key_obj.name or "Unnamed"
+    flash(request, "API key created! Save it now - you won't be able to see it again.", "success")
+    return RedirectResponse(url="/auth/profile?tab=api-keys", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/profile/api-keys/{key_id}/delete")
+async def delete_api_key(request: Request, key_id: int, user: User = Depends(get_authenticated_user)):
+    """Completely delete API key from database"""
+    # Clear session from new key if it exists
+    request.session.pop("new_api_key", None)
+    request.session.pop("new_api_key_name", None)
+    
+    success = await ApiKeyService.delete_api_key(key_id, user)
+    if success:
+        flash(request, "API key deleted successfully", "success")
+    else:
+        flash(request, "API key not found", "error")
+    return RedirectResponse(url="/auth/profile?tab=api-keys", status_code=status.HTTP_303_SEE_OTHER)

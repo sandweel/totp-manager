@@ -20,6 +20,7 @@ env/
 logs/
 node_modules/
 tailwindcss/node_modules/
+alembic/versions/
 .DS_Store
 *.swp
 *.swo
