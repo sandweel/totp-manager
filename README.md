@@ -114,19 +114,9 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 The app will be available at:
 👉 http://localhost:8000
 
-# Docker
-#### Build image
-```sh
-docker build -t totp-manager -f Dockerfile_single .
-```
-#### Run container
-```sh
-docker run --rm -v totp_db_data:/var/lib/mysql -v totp_app_logs:/app/logs -v totp_app_data:/app/data -v totp_app_alembic_versions:/app/alembic/versions --env-file .env totp-manager
-```
-
 # Docker Compose
 ```sh
-docker compose run -d
+docker compose up -d
 ```
 > **Note**:
 > Make sure to prepare **.env** before starting docker or docker compose
