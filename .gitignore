@@ -1,3 +1,9 @@
+infra/*.tfstate
+infra/*.tfstate.*
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfvars
+
 data/GeoLite2-City.mmdb
 static/css/style.css
 logs/*

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from slowapi import Limiter
@@ -8,7 +8,9 @@ from services.totp_service import TotpService
 from services.auth import get_authenticated_user
 from services.api_auth import get_user_from_api_key
 from services.api_key_service import ApiKeyService
+from services.import_export import build_qr_png
 from models import User
+import io
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -27,6 +29,15 @@ class TOTPUpdateRequest(BaseModel):
 class TOTPShareRequest(BaseModel):
     totp_ids: List[int]
     email: str
+
+class TOTPDeleteRequest(BaseModel):
+    ids: List[int]
+
+class TOTPExportRequest(BaseModel):
+    ids: List[int]
+
+class TOTPImportRequest(BaseModel):
+    uri: str
 
 class ApiKeyCreateRequest(BaseModel):
     name: Optional[str] = None
@@ -54,14 +65,25 @@ async def api_create_totp(request: Request, body: TOTPCreateRequest, user: User 
     await TotpService.create(body.account, body.issuer, body.secret, user)
     return JSONResponse(content={"message": "TOTP created successfully"})
 
-@router.delete("/v1/totp/{totp_id}")
+@router.post("/v1/totp/delete")
 @limiter.limit("10/minute")
-async def api_delete_totp(request: Request, totp_id: int, user: User = Depends(get_user_from_api_key)):
-    """Delete TOTP item"""
-    success = await TotpService.delete(totp_id, user)
-    if not success:
-        raise HTTPException(status_code=404, detail="TOTP item not found")
-    return JSONResponse(content={"message": "TOTP deleted successfully"})
+async def api_delete_totp(request: Request, body: TOTPDeleteRequest, user: User = Depends(get_user_from_api_key)):
+    """Delete TOTP item(s) - accepts array of IDs (can be single or multiple)"""
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+
+    deleted_count = 0
+    for item_id in body.ids:
+        if await TotpService.delete(item_id, user):
+            deleted_count += 1
+
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="No TOTP items found or deleted")
+
+    if len(body.ids) == 1:
+        return JSONResponse(content={"message": "TOTP deleted successfully", "deleted_count": deleted_count})
+    else:
+        return JSONResponse(content={"message": f"Deleted {deleted_count} item(s).", "deleted_count": deleted_count})
 
 @router.put("/v1/totp/{totp_id}")
 @limiter.limit("10/minute")
@@ -99,13 +121,56 @@ async def api_get_shared_users(request: Request, totp_id: int, user: User = Depe
         raise HTTPException(status_code=400, detail=error)
     return JSONResponse(content={"emails": emails})
 
+@router.post("/v1/totp/export")
+@limiter.limit("10/minute")
+async def api_export_totp_qr(request: Request, body: TOTPExportRequest, user: User = Depends(get_user_from_api_key)):
+    """Export TOTP items as QR code PNG"""
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+
+    raw_items = await TotpService.export_raw(user, body.ids)
+    if not raw_items:
+        raise HTTPException(status_code=404, detail="No TOTP items found")
+
+    png_bytes = build_qr_png(raw_items)
+    return StreamingResponse(
+        io.BytesIO(png_bytes),
+        media_type="image/png",
+        headers={"Content-Disposition": 'inline; filename="totp_export.png"'}
+    )
+
+@router.post("/v1/totp/export-uri")
+@limiter.limit("10/minute")
+async def api_export_totp_uri(request: Request, body: TOTPExportRequest, user: User = Depends(get_user_from_api_key)):
+    """Export TOTP items as Google Authenticator migration URI"""
+    if not body.ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+
+    raw_items = await TotpService.export_raw(user, body.ids)
+    if not raw_items:
+        raise HTTPException(status_code=404, detail="No TOTP items found")
+
+    from services.import_export import build_migration_uri
+    uri = build_migration_uri(raw_items)
+    return JSONResponse(content={"uri": uri})
+
+@router.post("/v1/totp/import")
+@limiter.limit("10/minute")
+async def api_import_totp(request: Request, body: TOTPImportRequest, user: User = Depends(get_user_from_api_key)):
+    """Import TOTP items from Google Authenticator migration URI"""
+    from services.import_export_service import ImportExportService
+    count, error = await ImportExportService.import_totp_uris(body.uri, user)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return JSONResponse(content={"message": f"Imported {count} item(s).", "count": count})
+
 # API endpoints for API key management (require web authentication)
 @router.post("/v1/api-keys", dependencies=[Depends(get_authenticated_user)])
 async def api_create_api_key(request: ApiKeyCreateRequest, user: User = Depends(get_authenticated_user)):
     """Create new API key (web interface only)"""
     plain_key, api_key_obj = await ApiKeyService.create_api_key(user, request.name)
     return JSONResponse(content={
-        "api_key": plain_key,  # Show only once!
+        "api_key": plain_key,
         "id": api_key_obj.id,
         "name": api_key_obj.name,
         "created_at": api_key_obj.created_at.isoformat()
@@ -127,6 +192,6 @@ async def api_revoke_api_key(key_id: int, user: User = Depends(get_authenticated
 
 @router.post("/v1/api-keys/revoke-all", dependencies=[Depends(get_authenticated_user)])
 async def api_revoke_all_api_keys(user: User = Depends(get_authenticated_user)):
-    """Отозвать все API ключи пользователя"""
+    """Revoke all API keys"""
     count = await ApiKeyService.revoke_all_api_keys(user)
     return JSONResponse(content={"message": f"Revoked {count} API key(s)"})
