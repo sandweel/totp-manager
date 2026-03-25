@@ -3,10 +3,12 @@ services:
     image: mariadb:10.11
     container_name: totp-manager-db
     restart: unless-stopped
-    env_file:
-      - .env_db
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: true
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
     volumes:
       - totp_db_data:/var/lib/mysql
     healthcheck:
@@ -25,6 +27,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      MYSQL_HOST: db
     ports:
       - "${PORT:-8000}:8000"
     volumes:

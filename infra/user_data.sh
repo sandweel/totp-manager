@@ -57,7 +57,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES=5
 REFRESH_TOKEN_EXPIRE_DAYS=30
 GUNICORN_WORKERS=1
 
-DATABASE_URL=mysql+asyncmy://${db_user}:${db_user_pass}@db:3306/${db_name}
+MYSQL_HOST=db
+MYSQL_PORT=3306
+MYSQL_DATABASE=${db_name}
+MYSQL_USER=${db_user}
+MYSQL_PASSWORD=${db_user_pass}
 
 ENCRYPTION_KEY=$(aws ssm get-parameter --name "${ssm_encryption_key_name}" --with-decryption --region ${aws_region} --query "Parameter.Value" --output text)
 SECRET_KEY=$(aws ssm get-parameter --name "${ssm_secret_key_name}" --with-decryption --region ${aws_region} --query "Parameter.Value" --output text)
@@ -65,11 +69,6 @@ MAILGUN_API_KEY=$(aws ssm get-parameter --name "${ssm_totp_mailgun_key}" --with-
 MAILGUN_DOMAIN=$(aws ssm get-parameter --name "${ssm_totp_mailgun_domain}" --with-decryption --region ${aws_region} --query "Parameter.Value" --output text)
 EOF
 
-cat <<EOF > .env_db
-MYSQL_DATABASE=${db_name}
-MYSQL_USER=${db_user}
-MYSQL_PASSWORD=${db_user_pass}
-EOF
 
 cat <<'EOF' > docker-compose-ec2.yml
 services:
@@ -77,10 +76,11 @@ services:
     image: mariadb:10.11
     container_name: totp-manager-db
     restart: unless-stopped
-    env_file:
-      - .env_db
     environment:
       MYSQL_ALLOW_EMPTY_PASSWORD: true
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - /mnt/app/mysql:/var/lib/mysql
     healthcheck:

@@ -1,6 +1,7 @@
 import os
 import base64
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 from cryptography.fernet import Fernet
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -12,7 +13,22 @@ from services.ua import ua_pretty
 load_dotenv()
 
 class Settings:
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
+    MYSQL_PORT: str = os.getenv("MYSQL_PORT", "3306")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE")
+    MYSQL_USER: str = os.getenv("MYSQL_USER")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD")
+
+    @property
+    def DATABASE_URL(self) -> str:
+        password = quote_plus(self.MYSQL_PASSWORD or "")
+        return (
+            f"mysql+asyncmy://{self.MYSQL_USER}:"
+            f"{password}@"
+            f"{self.MYSQL_HOST}:"
+            f"{self.MYSQL_PORT}/"
+            f"{self.MYSQL_DATABASE}"
+        )
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
     SECRET_KEY: str = os.getenv("SECRET_KEY")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
