@@ -1,0 +1,33 @@
+# Argo CD Application for the local kind cluster.
+# Apply with:  kubectl apply -f infra/argocd/application.yaml
+#
+# Argo CD pulls from git, so `master` must be pushed to origin first.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: totp-manager
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/sandweel/totp-manager.git
+    targetRevision: master
+    path: infra/kubernetes/overlays/kind
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: totp-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

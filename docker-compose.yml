@@ -1,22 +1,20 @@
 services:
   db:
-    image: mariadb:10.11
+    image: postgres:17-alpine
     container_name: totp-manager-db
     restart: unless-stopped
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: true
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - totp_db_data:/var/lib/mysql
+      - totp_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 20s
 
   app:
     build: .
@@ -28,16 +26,10 @@ services:
     env_file:
       - .env
     environment:
-      MYSQL_HOST: db
+      DB_HOST: db
+      DB_PORT: 5432
     ports:
       - "${PORT:-8000}:8000"
-    volumes:
-      - totp_app_logs:/app/logs
-      - totp_app_data:/app/data
-      - totp_app_alembic_versions:/app/alembic/versions
 
 volumes:
   totp_db_data:
-  totp_app_logs:
-  totp_app_data:
-  totp_app_alembic_versions:

@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: totp-migrate
+  labels:
+    app.kubernetes.io/name: totp-manager
+    app.kubernetes.io/component: migrate
+  annotations:
+    # Run after Postgres (wave -1), before the app (wave 2).
+    argocd.argoproj.io/sync-wave: "1"
+    # A Job spec is immutable: when the image tag changes, let Argo CD
+    # delete + recreate it instead of failing the apply.
+    argocd.argoproj.io/sync-options: Replace=true
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: totp-manager
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+#        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:17-alpine
+          command:
+            - sh
+            - -c
+            - 'until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER"; do echo "waiting for postgres..."; sleep 2; done'
+          envFrom:
+            - configMapRef:
+                name: totp-config
+      containers:
+        - name: migrate
+          image: totp-manager:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: totp-config
+            - secretRef:
+                name: totp-secret
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: totp.totp-psql.credentials.postgresql.acid.zalan.do
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "500m"
+              memory: 256Mi

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: totp-manager
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - secret.yaml
+
+images:
+  - name: totp-manager
+    newName: totp-manager
+    newTag: dev
+
+# Image is side-loaded into kind (`kind load docker-image`), never pulled.
+patches:
+  - target:
+      kind: Deployment
+      name: totp-manager
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target:
+      kind: Job
+      name: totp-migrate
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

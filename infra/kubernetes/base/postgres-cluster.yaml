@@ -1,0 +1,35 @@
+# Managed by the Zalando postgres-operator (must be installed in the cluster
+# first — see infra/kubernetes/README.md). The operator turns this CR into a Spilo
+# StatefulSet with streaming replication + automatic failover (Patroni).
+#
+# It also generates the DB password Secret:
+#   totp.totp-psql.credentials.postgresql.acid.zalan.do   (keys: username, password)
+# consumed by the app Deployment and the migrate Job.
+#
+# Services created by the operator:
+#   totp-psql        -> current master (use this for DB_HOST)
+#   totp-psql-repl   -> replicas only
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: totp-psql
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  teamId: totp
+  numberOfInstances: 2
+  postgresql:
+    version: "17"
+  volume:
+    size: 1Gi
+  users:
+    totp: []          # LOGIN role, no superuser
+  databases:
+    totp: totp        # database "totp" owned by role "totp"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi

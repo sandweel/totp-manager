@@ -1,7 +1,9 @@
 # 🔐 TOTP Manager
 
 A secure service for managing and sharing TOTP (2FA) secrets.  
-Built with **FastAPI**, **SQLAlchemy (async)**, **MySQL/MariaDB**, **Fernet encryption**, and **TailwindCSS** for styling.
+Built with **FastAPI**, **SQLAlchemy (async)**, **PostgreSQL**, **Fernet encryption**, and **TailwindCSS** for styling.
+
+Kubernetes / Argo CD manifests live in [`infra/kubernetes/`](infra/kubernetes/README.md).
 
 ## 🛠 Functionality
 
@@ -56,11 +58,15 @@ npm run watch
 Copy `.env_example` → `.env` and update the values according to your setup:
 
 ```ini
-# Database connection string (async MySQL)
-DATABASE_URL=mysql+asyncmy://<username>:<password>@<host>:<port>/<database>
+# Database connection (async PostgreSQL, psycopg-free — driver is asyncpg)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=totp
+DB_USER=totp
+DB_PASSWORD=
 
 # Encryption key (Base64 string, 32 bytes before encoding → ~44 characters after base64)
-# Used for encrypting sensitive data with Fernet
+# Master Fernet key — losing it makes every stored TOTP secret unrecoverable
 ENCRYPTION_KEY=
 
 # Secret key (random string, at least 32 bytes recommended, 64+ better)
@@ -95,11 +101,13 @@ MAILGUN_DOMAIN=
 ### Number of Gunicorn workers. Used only when running the app via Docker Compose.
 GUNICORN_WORKERS=
 ```
-### 5. Apply initial migration
+### 5. Apply migrations
+Migrations are committed under `alembic/versions/`. Just run:
 ```sh
-alembic revision --autogenerate -m "initial migration"
 alembic upgrade head
 ```
+For schema changes: edit `models.py`, then
+`alembic revision --autogenerate -m "..."` and commit the new file.
 ### 6. Download the latest MaxMind GeoIP City database (GeoLite2-City.mmdb)
 ##### From the official [website](https://dev.maxmind.com/geoip/geoip2/geolite2/) or third-party repositories
 

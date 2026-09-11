@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: totp-config
+data:
+  DB_HOST: totp-psql          # operator's master service (see postgres-cluster.yaml)
+  DB_PORT: "5432"
+  DB_NAME: totp
+  DB_USER: totp
+  FRONTEND_URL: "http://localhost:8000"
+  COOKIE_SECURE: "false"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "5"
+  REFRESH_TOKEN_EXPIRE_DAYS: "30"
+  ALLOWED_EMAIL_DOMAINS: ""
+  GUNICORN_WORKERS: "1"
+  # App container must not touch the schema; the migrate Job owns it.
+  RUN_MIGRATIONS: "0"

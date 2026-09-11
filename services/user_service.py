@@ -10,7 +10,7 @@ from models import User
 from services.auth import hash_password, verify_password, create_access_token
 from services.validator import validate_email, validate_password
 from constants import AppConstants
-from utils import generate_fernet_key
+from utils import generate_fernet_key, normalize_email
 
 
 class UserService:
@@ -21,6 +21,7 @@ class UserService:
         Returns: (success, user, error_message)
         """
         # Validate email
+        email = normalize_email(email)
         email_error = validate_email(email)
         if email_error:
             return False, None, email_error
@@ -56,7 +57,7 @@ class UserService:
     async def get_user_by_email(email: str) -> Optional[User]:
         """Get user by email"""
         async with async_session() as db:
-            result = await db.execute(select(User).where(User.email == email))
+            result = await db.execute(select(User).where(User.email == normalize_email(email)))
             return result.scalars().first()
 
     @staticmethod
@@ -108,9 +109,9 @@ class UserService:
         Returns: (success, error_message)
         """
         async with async_session() as db:
-            result = await db.execute(select(User).where(User.email == email))
+            result = await db.execute(select(User).where(User.email == normalize_email(email)))
             user = result.scalars().first()
-            
+
             if not user:
                 return True, None  # Don't reveal if user exists
             

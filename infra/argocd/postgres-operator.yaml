@@ -1,0 +1,37 @@
+# Zalando postgres-operator, installed as its own Argo CD Application (Helm).
+# Apply BEFORE the totp-manager Application so the `postgresql` CRD exists.
+#
+#   kubectl apply -f infra/argocd/postgres-operator.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+    chart: postgres-operator
+    targetRevision: 1.14.0
+    helm:
+      values: |
+        # kind uses the rancher local-path provisioner; leave pod anti-affinity
+        # OFF — with node-pinned local-path PVs the operator's rolling update can
+        # otherwise wedge a replica in Pending (see notes in infra/kubernetes/README.md).
+        configKubernetes:
+          enable_pod_antiaffinity: false
+        configGeneral:
+          # pin the Spilo image so `helm`/Argo refreshes don't drift it
+          docker_image: ghcr.io/zalando/spilo-17:4.0-p2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: postgres-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: totp-manager
+  labels:
+    app.kubernetes.io/name: totp-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: totp.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: totp-manager
+                port:
+                  name: http
