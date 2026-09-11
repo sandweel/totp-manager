@@ -83,18 +83,29 @@ automatically. The operator only watches *its own* child Secrets, so a stale
 Secret's deletion alone doesn't trigger a re-reconcile — deleting/re-applying
 the `SopsSecret` CR does.
 
-Sync order (`argocd.argoproj.io/sync-wave`):
+Sync order for regular resources (`argocd.argoproj.io/sync-wave`):
 
 | wave | resources |
 |------|-----------|
 | -2   | Namespace |
 | -1   | ConfigMap, `totp-secret` (`SopsSecret`), `postgresql` CR |
-| 1    | `totp-migrate` Job |
 | 2    | app Deployment + Service, Ingress |
 
-Both the Job and the Deployment have a `wait-for-postgres` initContainer, so a
-plain `kubectl apply -k` also works — the app pods stay in `ContainerCreating`
-(missing generated Secret) / init-wait until the cluster is up, then start.
+`totp-migrate` is not a wave at all — it's a **`PreSync` hook**
+(`argocd.argoproj.io/hook: PreSync`, `hook-delete-policy: BeforeHookCreation`).
+Hooks run before *any* regular resource on every sync that changes something,
+and Argo CD deletes/recreates the hook Job itself — no `ttlSecondsAfterFinished`
+needed. (Earlier this was a wave-1 resource with a TTL; combined with
+`selfHeal: true` that made Kubernetes' own Job GC and Argo CD's drift-healing
+fight each other, recreating the Job forever. A hook isn't part of the
+continuously-reconciled desired state, so that loop can't happen.)
+
+Both the Job and the Deployment have a `wait-for-postgres` initContainer for
+safety, but **the hook annotations only mean something to Argo CD** — a plain
+`kubectl apply -k` treats `totp-migrate` as an ordinary Job: it runs once, and
+on a later apply with a changed image tag you must `kubectl delete job
+totp-migrate` yourself first (immutable `spec.template`, no `Replace=true`
+without Argo CD). See 4a below.
 
 ---
 
@@ -156,6 +167,15 @@ kubectl -n totp-manager get pods -w
 Expected: `totp-psql-0` + `totp-psql-1` Running → `totp-migrate-*` Completed →
 `totp-manager-*` Ready.
 
+Without Argo CD, `totp-migrate`'s `PreSync`/`hook-delete-policy` annotations
+are just inert labels — plain `kubectl apply -k` runs it once as an ordinary
+Job. On a schema change, delete it yourself before re-applying:
+```sh
+kubectl -n totp-manager delete job totp-migrate --ignore-not-found
+kubectl apply -k infra/kubernetes/overlays/kind
+kubectl -n totp-manager wait --for=condition=complete job/totp-migrate --timeout=120s
+```
+
 Check the operator picked up the cluster:
 
 ```sh
@@ -165,8 +185,8 @@ kubectl -n totp-manager get secret totp.totp-psql.credentials.postgresql.acid.za
 
 ## 4b. Deploy with Argo CD
 
-Argo CD reads from git — push this branch first and set `targetRevision` in
-`infra/argocd/application.yaml` to match (currently `feat/postgres-k8s-argocd`).
+Argo CD reads from git — push `master` first (`infra/argocd/application.yaml`
+already points `targetRevision` at it).
 
 ```sh
 kubectl create namespace argocd
@@ -207,7 +227,7 @@ curl http://localhost:8000/health
 1. edit `models.py`
 2. `alembic revision --autogenerate -m "..."` against a local Postgres, commit the file in `alembic/versions/`
 3. rebuild the image with a new tag, bump `newTag` in `overlays/kind/kustomization.yaml`
-4. sync — the `totp-migrate` Job is recreated (`Replace=true`) and runs before the new app pods roll out
+4. sync — the `PreSync` hook reruns `totp-migrate` before the new app pods roll out
 
 ## Notes / limits
 

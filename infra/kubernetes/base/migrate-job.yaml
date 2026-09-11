@@ -6,14 +6,15 @@ metadata:
     app.kubernetes.io/name: totp-manager
     app.kubernetes.io/component: migrate
   annotations:
-    # Run after Postgres (wave -1), before the app (wave 2).
-    argocd.argoproj.io/sync-wave: "1"
-    # A Job spec is immutable: when the image tag changes, let Argo CD
-    # delete + recreate it instead of failing the apply.
-    argocd.argoproj.io/sync-options: Replace=true
+    # PreSync hook: runs before every sync that changes something, ahead of
+    # all regular (non-hook) resources - no sync-wave needed. ArgoCD deletes
+    # the previous hook Job itself (BeforeHookCreation) and recreates it, so
+    # no ttlSecondsAfterFinished either - that combined with selfHeal was
+    # causing the Job to be recreated on its own every ~10 minutes forever.
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 4
-  ttlSecondsAfterFinished: 600
   template:
     metadata:
       labels:
