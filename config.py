@@ -13,21 +13,22 @@ from services.ua import ua_pretty
 load_dotenv()
 
 class Settings:
-    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT: str = os.getenv("MYSQL_PORT", "3306")
-    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE")
-    MYSQL_USER: str = os.getenv("MYSQL_USER")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD")
+    # Prefer DB_*, fall back to legacy MYSQL_* names for backwards compatibility.
+    DB_HOST: str = os.getenv("DB_HOST") or os.getenv("MYSQL_HOST", "localhost")
+    DB_PORT: str = os.getenv("DB_PORT") or os.getenv("MYSQL_PORT", "5432")
+    DB_NAME: str = os.getenv("DB_NAME") or os.getenv("MYSQL_DATABASE")
+    DB_USER: str = os.getenv("DB_USER") or os.getenv("MYSQL_USER")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD") or os.getenv("MYSQL_PASSWORD")
 
     @property
     def DATABASE_URL(self) -> str:
-        password = quote_plus(self.MYSQL_PASSWORD or "")
+        password = quote_plus(self.DB_PASSWORD or "")
         return (
-            f"mysql+asyncmy://{self.MYSQL_USER}:"
+            f"postgresql+asyncpg://{self.DB_USER}:"
             f"{password}@"
-            f"{self.MYSQL_HOST}:"
-            f"{self.MYSQL_PORT}/"
-            f"{self.MYSQL_DATABASE}"
+            f"{self.DB_HOST}:"
+            f"{self.DB_PORT}/"
+            f"{self.DB_NAME}"
         )
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY")
     SECRET_KEY: str = os.getenv("SECRET_KEY")
@@ -62,4 +63,4 @@ Base = declarative_base()
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["ua_pretty"] = ua_pretty
 
-http_client = httpx.AsyncClient()
+http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))

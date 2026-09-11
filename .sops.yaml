@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: infra/kubernetes/overlays/.*/secret\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1pu6tx2dzgraydj8uchy4265clmzgv57pz60ktphwsqyasunv8arsd8aqg6

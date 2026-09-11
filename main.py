@@ -1,7 +1,9 @@
+import sys
 import uvicorn
 import logging
 import uuid
 import os
+from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, Request, Depends, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -15,7 +17,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from config import templates, settings
+from config import templates, settings, http_client
 from routes.auth import router as auth_router, get_current_user_if_exists, set_auth_cookies
 from routes.totp import router as totp_router
 from routes.api import router as api_router
@@ -23,16 +25,24 @@ from routes.sessions import router as sessions_router
 from models import User
 
 logging.basicConfig(
-    filename="logs/error.log",
-    level=logging.ERROR,
+    stream=sys.stdout,
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y/%m/%d %H:%M:%S"
 )
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    await http_client.aclose()
+
+
 app = (FastAPI(
     docs_url=None,
     redoc_url=None,
-    openapi_url=None
+    openapi_url=None,
+    lifespan=lifespan,
     )
 )
 

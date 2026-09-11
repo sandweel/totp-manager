@@ -10,6 +10,15 @@ def generate_fernet_key() -> bytes:
     return Fernet.generate_key()
 
 
+def normalize_email(email: Optional[str]) -> str:
+    """Canonical form for storage and lookup.
+
+    Postgres string columns are case-sensitive (unlike MySQL's default
+    case-insensitive collation), so email must be normalised explicitly.
+    """
+    return (email or "").strip().lower()
+
+
 def is_valid_base32(secret: str) -> bool:
     """Check if string is valid Base32"""
     secret_clean = secret.strip().replace(" ", "")

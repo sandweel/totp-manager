@@ -2,6 +2,7 @@ from sqlalchemy import select, delete
 from models import TOTPItem, User, SharedTOTP
 from config import async_session, master_fernet
 from cryptography.fernet import Fernet
+from utils import normalize_email
 import pyotp
 
 
@@ -126,6 +127,7 @@ class TotpService:
 
     @staticmethod
     async def share_totp(totp_ids: list[int], email: str, user: User):
+        email = normalize_email(email)
         async with async_session() as session:
             result = await session.execute(select(User).where(User.email == email))
             target_user = result.scalars().first()
@@ -193,6 +195,7 @@ class TotpService:
 
     @staticmethod
     async def unshare_totp(totp_id: int, email: str, user: User):
+        email = normalize_email(email)
         async with async_session() as session:
             # Verify the TOTP item belongs to the user
             result = await session.execute(

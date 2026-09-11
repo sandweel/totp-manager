@@ -8,9 +8,9 @@ class AppConstants:
     # Password validation
     MIN_PASSWORD_LENGTH = 10
     
-    # TOTP validation
-    MAX_ACCOUNT_LENGTH = 32
-    MAX_ISSUER_LENGTH = 32
+    # TOTP validation (stays <= models String(128) so no migration needed)
+    MAX_ACCOUNT_LENGTH = 64
+    MAX_ISSUER_LENGTH = 64
     
     # Session management
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
